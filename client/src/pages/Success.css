@@ -1,0 +1,130 @@
+.success-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+}
+
+.success-container {
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-10);
+}
+
+.result-icon {
+    width: 88px;
+    height: 88px;
+    border-radius: var(--radius-2xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--space-6);
+}
+
+.result-icon svg {
+    width: 40px;
+    height: 40px;
+}
+
+.result-icon.present {
+    background: var(--success-muted);
+    border: 2px solid var(--success);
+}
+
+.result-icon.present svg {
+    color: var(--success);
+}
+
+.result-icon.late {
+    background: var(--warning-muted);
+    border: 2px solid var(--warning);
+}
+
+.result-icon.late svg {
+    color: var(--warning);
+}
+
+.result-icon.invalid,
+.result-icon.error {
+    background: var(--error-muted);
+    border: 2px solid var(--error);
+}
+
+.result-icon.invalid svg,
+.result-icon.error svg {
+    color: var(--error);
+}
+
+.success-container h1 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-2);
+}
+
+.subtitle {
+    color: var(--text-muted);
+    margin-bottom: var(--space-6);
+    font-size: var(--text-sm);
+}
+
+.result-details {
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) 0;
+}
+
+.detail-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.detail-label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.detail-value {
+    font-weight: 600;
+    font-size: var(--text-sm);
+}
+
+.message-box {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-6);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.message-box.present {
+    background: var(--success-muted);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--success);
+}
+
+.message-box.late {
+    background: var(--warning-muted);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: var(--warning);
+}
+
+.message-box.invalid {
+    background: var(--error-muted);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--error);
+}
+
+.success-container .btn {
+    width: 100%;
+}

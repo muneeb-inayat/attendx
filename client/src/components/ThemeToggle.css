@@ -1,0 +1,41 @@
+.theme-toggle {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--duration-normal) var(--ease-out);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-focus);
+    transform: scale(1.05);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+.theme-icon {
+    position: absolute;
+    font-size: 1.25rem;
+    transition: all var(--duration-normal) var(--ease-out);
+}
+
+.theme-icon.show {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+}
+
+.theme-icon.hide {
+    opacity: 0;
+    transform: rotate(180deg) scale(0);
+}

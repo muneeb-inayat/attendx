@@ -1,0 +1,453 @@
+/* Pending Approval Page - Compact & Mobile-Friendly */
+
+.pending-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Animated Background */
+.pending-bg-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.pending-circle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    animation: float 20s infinite ease-in-out;
+}
+
+.pending-circle-1 {
+    width: 200px;
+    height: 200px;
+    top: -50px;
+    left: -50px;
+}
+
+.pending-circle-2 {
+    width: 150px;
+    height: 150px;
+    bottom: -30px;
+    right: -30px;
+    animation-delay: 5s;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(20px, -20px);
+    }
+}
+
+/* Main Content - More Compact */
+.pending-content {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Icon - Smaller */
+.pending-icon-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+}
+
+.pending-icon-pulse {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    opacity: 0.3;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.3;
+    }
+
+    50% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
+}
+
+.pending-icon {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 50%;
+    font-size: 2.5rem;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+}
+
+/* Header - Compact */
+.pending-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+}
+
+.pending-subtitle {
+    font-size: 0.9rem;
+    color: #666;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Status Card - Compact */
+.pending-status-card {
+    padding: 16px;
+    background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.pending-status-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2d3436;
+    margin-bottom: 6px;
+}
+
+.pending-status-card p {
+    font-size: 0.85rem;
+    color: #636e72;
+    margin: 0;
+}
+
+/* User Info - Compact */
+.pending-user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.pending-user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.pending-user-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #2d3436;
+    margin: 0 0 2px 0;
+}
+
+.pending-user-email {
+    font-size: 0.8rem;
+    color: #636e72;
+    margin: 0;
+}
+
+/* Timeline - Compact */
+.pending-timeline {
+    margin-bottom: 14px;
+}
+
+.pending-timeline-item {
+    display: flex;
+    gap: 10px;
+    position: relative;
+    padding-bottom: 12px;
+}
+
+.pending-timeline-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: 20px;
+    width: 2px;
+    height: calc(100% - 20px);
+    background: #e0e0e0;
+}
+
+.pending-timeline-item.completed::before {
+    background: #667eea;
+}
+
+.pending-timeline-item.active::before {
+    background: linear-gradient(to bottom, #667eea, #e0e0e0);
+}
+
+.pending-timeline-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    border: 3px solid white;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.pending-timeline-item.completed .pending-timeline-dot {
+    background: #667eea;
+}
+
+.pending-timeline-item.active .pending-timeline-dot {
+    background: #fdcb6e;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(253, 203, 110, 0.7);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(253, 203, 110, 0);
+    }
+}
+
+.pending-timeline-item h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2d3436;
+    margin: 0 0 2px 0;
+}
+
+.pending-timeline-item p {
+    font-size: 0.75rem;
+    color: #636e72;
+    margin: 0;
+}
+
+.pending-timeline-item.completed h4 {
+    color: #667eea;
+}
+
+.pending-timeline-item.active h4 {
+    color: #fdcb6e;
+}
+
+/* Info Box - Compact */
+.pending-info-box {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    background: #e3f2fd;
+    border-radius: 10px;
+    border-left: 3px solid #2196f3;
+    margin-bottom: 14px;
+}
+
+.pending-info-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.pending-info-box h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1976d2;
+    margin: 0 0 6px 0;
+}
+
+.pending-info-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.pending-info-box li {
+    font-size: 0.75rem;
+    color: #424242;
+    padding: 3px 0;
+    padding-left: 16px;
+    position: relative;
+}
+
+.pending-info-box li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #2196f3;
+    font-weight: 700;
+}
+
+/* Actions - Single Button */
+.pending-actions {
+    margin-bottom: 12px;
+}
+
+.pending-btn-logout {
+    width: 100%;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.pending-btn-logout:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Footer - Compact */
+.pending-footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #999;
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 480px) {
+    .pending-content {
+        padding: 20px 16px;
+    }
+
+    .pending-title {
+        font-size: 1.3rem;
+    }
+
+    .pending-icon-wrapper {
+        width: 70px;
+        height: 70px;
+    }
+
+    .pending-icon {
+        font-size: 2rem;
+    }
+
+    .pending-actions {
+        flex-direction: column;
+    }
+
+    .pending-timeline-item {
+        padding-bottom: 12px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .pending-content {
+        background: rgba(30, 30, 30, 0.95);
+    }
+
+    .pending-title {
+        -webkit-text-fill-color: white;
+        background: linear-gradient(135deg, #8b9cff, #9b6fd6);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
+
+    .pending-subtitle {
+        color: #aaa;
+    }
+
+    .pending-user-info {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .pending-user-name {
+        color: #fff;
+    }
+
+    .pending-user-email {
+        color: #aaa;
+    }
+
+    .pending-timeline-item h4 {
+        color: #fff;
+    }
+
+    .pending-timeline-item p {
+        color: #aaa;
+    }
+
+    .pending-info-box {
+        background: rgba(33, 150, 243, 0.1);
+    }
+
+    .pending-info-box h4 {
+        color: #64b5f6;
+    }
+
+    .pending-info-box li {
+        color: #ccc;
+    }
+
+    .pending-footer {
+        color: #666;
+    }
+}

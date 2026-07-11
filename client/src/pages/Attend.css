@@ -1,0 +1,435 @@
+/* Attend Page - v5.0 Mobile-First Design */
+
+.attend-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    /* Dynamic viewport for mobile */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+    background: var(--bg-secondary);
+}
+
+.attend-card {
+    max-width: 480px;
+    width: 100%;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-subtle);
+}
+
+.attend-card h1 {
+    text-align: center;
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
+}
+
+/* Session Info Card */
+.session-info {
+    background: linear-gradient(135deg, var(--primary-muted), transparent);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-4);
+    margin-bottom: var(--space-5);
+    text-align: center;
+}
+
+.session-info h3 {
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+}
+
+.session-info .course-code {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+}
+
+.session-details {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.session-details .detail {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-3);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-full);
+}
+
+.session-details .detail.active {
+    color: var(--success);
+}
+
+.session-details .detail.inactive {
+    color: var(--error);
+}
+
+.security-badge {
+    display: inline-block;
+    margin-top: var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    padding: var(--space-1) var(--space-3);
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border-radius: var(--radius-full);
+}
+
+/* Status Box */
+.status-box {
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Location Step */
+.location-step {
+    text-align: center;
+    padding: var(--space-6);
+}
+
+.location-step p {
+    color: var(--text-muted);
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+}
+
+/* Confirm Step */
+.confirm-step {
+    text-align: center;
+}
+
+.location-confirmed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.location-confirmed .check-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--success);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-lg);
+    animation: pulse 2s ease infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.location-confirmed p {
+    font-weight: 600;
+    color: var(--success);
+}
+
+/* Location Info - V5: Cleaner display */
+.location-info {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+    text-align: left;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+}
+
+.location-info p {
+    margin-bottom: var(--space-1);
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+.location-info .within-range {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.location-info .out-of-range {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+/* V5: Location status with better visibility */
+.location-status {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    line-height: 1.5;
+}
+
+/* Loading State */
+.loading-state {
+    text-align: center;
+    padding: var(--space-6);
+}
+
+.loading-state p {
+    margin-top: var(--space-4);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+/* V5: Enhanced Spinner with GPS pulse effect */
+.spinner {
+    width: 56px;
+    height: 56px;
+    border: 4px solid var(--border-subtle);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+    position: relative;
+}
+
+.spinner::after {
+    content: '📡';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Success Message */
+.success-message {
+    text-align: center;
+    padding: var(--space-6);
+}
+
+.success-icon {
+    font-size: 4rem;
+    margin-bottom: var(--space-4);
+    animation: successBounce 0.6s ease;
+}
+
+@keyframes successBounce {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.success-message h2 {
+    color: var(--success);
+    margin-bottom: var(--space-2);
+    font-size: var(--text-xl);
+}
+
+.success-message p {
+    color: var(--text-muted);
+    margin-bottom: var(--space-5);
+}
+
+/* V5: Error Message with better readability */
+.error-message {
+    text-align: center;
+    padding: var(--space-5);
+    background: var(--error-muted);
+    border: 1px solid var(--error);
+    border-radius: var(--radius-xl);
+}
+
+.error-icon {
+    font-size: 2.5rem;
+    margin-bottom: var(--space-3);
+}
+
+.error-message p {
+    color: var(--error);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-sm);
+    white-space: pre-line;
+    /* V5: Support multi-line error messages */
+    line-height: 1.6;
+    text-align: left;
+}
+
+.error-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Status Text */
+.status-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-top: var(--space-4);
+}
+
+/* Security Footer */
+.security-footer {
+    text-align: center;
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.security-footer small {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+}
+
+/* V5: Buttons - Larger touch targets for mobile */
+.btn {
+    padding: var(--space-4) var(--space-6);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    font-size: var(--text-base);
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    min-height: 48px;
+    /* Minimum touch target size */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success), #059669);
+    color: white;
+    width: 100%;
+    font-size: var(--text-lg);
+    padding: var(--space-5) var(--space-6);
+}
+
+.btn-success:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+/* V5: Mobile Optimizations */
+@media (max-width: 480px) {
+    .attend-page {
+        padding: var(--space-3);
+        align-items: flex-start;
+        padding-top: var(--space-6);
+    }
+
+    .attend-card {
+        padding: var(--space-4);
+        border-radius: var(--radius-xl);
+    }
+
+    .attend-card h1 {
+        font-size: var(--text-lg);
+    }
+
+    .session-details {
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .error-actions {
+        flex-direction: column;
+    }
+
+    .error-actions .btn {
+        width: 100%;
+    }
+
+    .location-info {
+        font-size: 0.7rem;
+    }
+}
+
+/* V5: Button Spinner for loading state */
+.btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+
+/* V5: Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+
+    .spinner,
+    .success-icon,
+    .location-confirmed .check-icon,
+    .btn-spinner {
+        animation: none;
+    }
+}

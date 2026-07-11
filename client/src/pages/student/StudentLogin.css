@@ -1,0 +1,102 @@
+.student-login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+}
+
+.student-login-page .login-container {
+    width: 100%;
+    max-width: 460px;
+}
+
+.student-login-page .login-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+}
+
+.student-login-page .login-header {
+    padding: var(--space-8) var(--space-8) var(--space-6);
+    text-align: center;
+    border-bottom: 1px solid var(--border-subtle);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
+}
+
+.student-login-page .login-icon.student {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto var(--space-4);
+    background: var(--success-muted);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.student-login-page .login-icon.student svg {
+    width: 24px;
+    height: 24px;
+    color: var(--success);
+}
+
+.student-login-page .login-form {
+    padding: var(--space-6);
+}
+
+.student-login-page .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.student-login-page .login-btn {
+    width: 100%;
+    padding: var(--space-4);
+    font-size: var(--text-base);
+    margin-top: var(--space-2);
+}
+
+.student-login-page .login-footer {
+    padding: var(--space-6);
+    text-align: center;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.student-login-page .login-footer p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.student-login-page .switch-btn {
+    background: none;
+    border: none;
+    color: var(--success);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: var(--space-2);
+}
+
+.forgot-link-wrapper {
+    text-align: right;
+    margin-bottom: var(--space-4);
+}
+
+.forgot-link {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.forgot-link:hover {
+    color: var(--success);
+}
+
+@media (max-width: 500px) {
+    .student-login-page .form-row {
+        grid-template-columns: 1fr;
+    }
+}

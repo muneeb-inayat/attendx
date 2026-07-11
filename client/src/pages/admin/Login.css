@@ -1,0 +1,111 @@
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+}
+
+.login-container {
+    width: 100%;
+    max-width: 420px;
+}
+
+.login-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+}
+
+.login-header {
+    padding: var(--space-8) var(--space-8) var(--space-6);
+    text-align: center;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--gradient-surface);
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-6);
+    transition: color var(--duration-fast) var(--ease-out);
+}
+
+.back-link:hover {
+    color: var(--text-primary);
+}
+
+.login-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto var(--space-4);
+    background: var(--primary-muted);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-icon svg {
+    width: 24px;
+    height: 24px;
+    color: var(--primary);
+}
+
+.login-header h1 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-2);
+}
+
+.login-header p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.login-form {
+    padding: var(--space-8);
+}
+
+.login-btn {
+    width: 100%;
+    padding: var(--space-4);
+    font-size: var(--text-base);
+    margin-top: var(--space-2);
+}
+
+.login-footer {
+    padding: var(--space-6) var(--space-8);
+    text-align: center;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.login-footer p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.switch-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: var(--space-2);
+    transition: color var(--duration-fast) var(--ease-out);
+}
+
+.switch-btn:hover {
+    color: var(--primary-hover);
+}
+
+.login-btn .spinner {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+}

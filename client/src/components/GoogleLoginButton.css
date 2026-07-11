@@ -1,0 +1,89 @@
+/* Google Login Button Styles */
+
+.google-login-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: gsiSlideIn 0.3s ease-out;
+}
+
+@keyframes gsiSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading State */
+.google-button-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 13px 24px;
+    background: linear-gradient(135deg, #4285f4 0%, #5a9cf4 100%);
+    border-radius: 24px;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 500;
+    width: 100%;
+    max-width: 280px;
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);
+}
+
+.google-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: gsiSpin 0.7s linear infinite;
+}
+
+@keyframes gsiSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error State */
+.google-button-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 280px;
+    padding: 13px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.8rem;
+}
+
+/* Hover effect on container */
+.google-login-wrapper>div:last-child {
+    transition: transform 0.2s ease;
+}
+
+.google-login-wrapper>div:last-child:hover {
+    transform: translateY(-2px);
+}
+
+/* Mobile */
+@media (max-width: 380px) {
+
+    .google-button-loading,
+    .google-button-error {
+        max-width: 260px;
+        padding: 12px 18px;
+        font-size: 0.75rem;
+    }
+}

@@ -1,0 +1,415 @@
+/* SecurityAlert Component Styles - v5 Mobile-First */
+
+/* Base Alert Styles */
+.security-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-4);
+    animation: slideIn 0.3s var(--ease-out);
+    position: relative;
+}
+
+.security-alert.exiting {
+    animation: slideOut 0.3s var(--ease-out) forwards;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Alert Type Variants */
+.security-alert-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+}
+
+.security-alert-error {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1));
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+}
+
+.security-alert-blocked {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(127, 29, 29, 0.15));
+    border: 2px solid rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+}
+
+.security-alert-success {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+}
+
+/* Alert Icon */
+.security-alert-icon {
+    font-size: 1.75rem;
+    flex-shrink: 0;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.security-alert-blocked .security-alert-icon {
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20%,
+    60% {
+        transform: translateX(-5px);
+    }
+
+    40%,
+    80% {
+        transform: translateX(5px);
+    }
+}
+
+/* Alert Content */
+.security-alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.security-alert-title {
+    font-size: var(--text-base);
+    font-weight: 700;
+    margin-bottom: var(--space-1);
+    color: var(--text-primary);
+}
+
+.security-alert-warning .security-alert-title {
+    color: var(--warning);
+}
+
+.security-alert-error .security-alert-title,
+.security-alert-blocked .security-alert-title {
+    color: var(--error);
+}
+
+.security-alert-success .security-alert-title {
+    color: var(--success);
+}
+
+.security-alert-message {
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.security-alert-details {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.security-alert-code {
+    display: inline-block;
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-sm);
+}
+
+/* Dismiss Button */
+.security-alert-dismiss {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.security-alert-dismiss:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Proxy Warning - Full Screen Blocker
+   ======================================== */
+
+.proxy-warning-container {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.proxy-warning {
+    max-width: 480px;
+    width: 100%;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-8);
+    text-align: center;
+    animation: scaleIn 0.4s var(--ease-out);
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.proxy-warning.blocked {
+    border: 2px solid var(--error);
+    box-shadow: 0 0 60px rgba(239, 68, 68, 0.3);
+}
+
+.proxy-warning.warning {
+    border: 2px solid var(--warning);
+    box-shadow: 0 0 60px rgba(245, 158, 11, 0.3);
+}
+
+.proxy-warning-icon {
+    font-size: 4rem;
+    margin-bottom: var(--space-4);
+    animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.proxy-warning-title {
+    font-size: var(--text-2xl);
+    font-weight: 800;
+    margin-bottom: var(--space-3);
+}
+
+.proxy-warning.blocked .proxy-warning-title {
+    color: var(--error);
+}
+
+.proxy-warning.warning .proxy-warning-title {
+    color: var(--warning);
+}
+
+.proxy-warning-message {
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: var(--space-6);
+}
+
+/* Info Items */
+.proxy-warning-info {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-6);
+    text-align: left;
+}
+
+.proxy-warning-info-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.proxy-warning-info-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.info-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+/* Consequences Box */
+.proxy-warning-consequences {
+    background: var(--error-muted);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-6);
+    text-align: left;
+}
+
+.proxy-warning-consequences h4 {
+    font-size: var(--text-sm);
+    color: var(--error);
+    margin-bottom: var(--space-3);
+}
+
+.proxy-warning-consequences ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.proxy-warning-consequences li {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    padding: var(--space-1) 0;
+    padding-left: var(--space-4);
+    position: relative;
+}
+
+.proxy-warning-consequences li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--error);
+}
+
+/* ========================================
+   Device Warning - Inline Alert
+   ======================================== */
+
+.device-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+    text-align: center;
+}
+
+.device-warning-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.device-warning-icon {
+    font-size: 1.5rem;
+}
+
+.device-warning-header h3 {
+    font-size: var(--text-lg);
+    color: var(--warning);
+}
+
+.device-warning-message {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+}
+
+.device-warning-message .roll-no {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+}
+
+.device-warning-instruction {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--space-4);
+}
+
+/* ========================================
+   Mobile Responsiveness
+   ======================================== */
+
+@media (max-width: 480px) {
+    .security-alert {
+        flex-direction: column;
+        text-align: center;
+        padding: var(--space-4);
+    }
+
+    .security-alert-icon {
+        font-size: 2rem;
+    }
+
+    .proxy-warning {
+        padding: var(--space-5);
+    }
+
+    .proxy-warning-icon {
+        font-size: 3rem;
+    }
+
+    .proxy-warning-title {
+        font-size: var(--text-xl);
+    }
+
+    .proxy-warning-message {
+        font-size: var(--text-sm);
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+
+    .security-alert,
+    .proxy-warning,
+    .security-alert-icon,
+    .proxy-warning-icon {
+        animation: none;
+    }
+}
