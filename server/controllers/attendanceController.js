@@ -473,6 +473,36 @@ if (!fullStudent) {
     });
 }
 
+console.log("========== STUDENT DEBUG ==========");
+console.log("Student:", student.email);
+console.log("Course:", course.courseName);
+console.log("Course ID:", course._id.toString());
+
+console.log(
+    "Assigned Courses:",
+    fullStudent.assignedCourses.map(id => id.toString())
+);
+
+console.log(
+    "Elective Courses:",
+    fullStudent.electiveCourses.map(id => id.toString())
+);
+
+console.log(
+    "isAssigned:",
+    fullStudent.assignedCourses.some(
+        id => id.toString() === course._id.toString()
+    )
+);
+
+console.log(
+    "isElective:",
+    fullStudent.electiveCourses.some(
+        id => id.toString() === course._id.toString()
+    )
+);
+console.log("==================================");
+
 // Check assigned courses
 const isAssigned = fullStudent.assignedCourses.some(
     courseId => courseId.toString() === course._id.toString()

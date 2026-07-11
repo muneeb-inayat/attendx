@@ -77,27 +77,29 @@ const Attend = () => {
         }
     }, [step, requestLocation]);
 
-    // Fetch session info
+
+
     const fetchSessionInfo = async () => {
         try {
-            setStep('init');
-            setStatusMsg('Verifying session...');
+            alert("fetchSessionInfo called");
+            console.log("Fetching session info...");
 
             const res = await axios.get(`${API_URL}/sessions/${sessionId}/info`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            console.log("Session info received", res.data);
+
             setSessionInfo(res.data.data);
-            setStep('location');
+
+            console.log("Setting step to location");
+
+            setStep("location");
             setStatusMsg('Getting your location...');
 
-        } catch (error) {
-            setStep('error');
-            const errMsg = error.response?.data?.error || 'Invalid or expired session';
-            setStatusMsg(errMsg);
 
-            // Show eligibility details if available
-            // Details are handled server-side
+        } catch (err) {
+            console.log("Session info failed", err.response?.data);
         }
     };
 
@@ -119,6 +121,7 @@ const Attend = () => {
 
     // V5: Request location with multi-sample collection
     const requestLocation = useCallback(() => {
+        alert("requestLocation called");
         console.log("requestLocation called");
         setLocationStatus('📡 Acquiring GPS signal...');
 
@@ -222,7 +225,7 @@ const Attend = () => {
                 processLocation(bestSample, samples);
             }
         }, collectionDuration + 500);
-    },[sessionInfo, calculateDistance]);
+    }, [sessionInfo, calculateDistance]);
 
     // V5: Handle location errors with clear messages
     const handleLocationError = (error) => {
