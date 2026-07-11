@@ -15,6 +15,7 @@ export default {
 
     // Frontend (remove trailing slash to prevent CORS mismatch)
     frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, ''),
+    frontendUrl2: (process.env.FRONTEND_URL_2 || 'http://localhost:5173').replace(/\/+$/, ''),
 
     // Email config
     smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
