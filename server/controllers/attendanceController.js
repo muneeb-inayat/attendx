@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Attendance, Session, Course, AuditLog, DeviceRegistry, FailedAttempt } from '../models/index.js';
+import { Attendance, Session, Course, AuditLog, DeviceRegistry, FailedAttempt, User } from '../models/index.js';
 import { redisService } from '../config/redis.js';
 import { trackFailedAttempt, isBlocked } from '../middleware/rateLimiter.js';
 import {
@@ -458,79 +458,49 @@ export const markAttendance = async (req, res) => {
         }
         validationResults.deviceValid = true;
 
-        // ========================================
-        // CHECK 7: Academic Eligibility
-        // ========================================
-        const academicState = student.academicState;
-        const studentBranchCode = (student.branchCode || '').toLowerCase();
-        const courseBranchCode = (course.branch || '').toLowerCase();
+// ========================================
+// CHECK 7: Academic Eligibility
+// ========================================
 
-        // Check if student's branch matches course branch
-        const branchMatch = studentBranchCode === courseBranchCode;
-        const yearMatch = course.year === academicState?.year;
+// Reload full student document with course assignments
+const fullStudent = await User.findById(student._id)
+    .select("assignedCourses electiveCourses");
 
-        // Check batch eligibility:
-        // - If course has no batch or batch is 'all', everyone is eligible
-        // - If student has no batch set, they're eligible for 'all' courses only
-        // - Otherwise, batch must match
-        const courseBatch = course.batch || 'all';
-        const studentBatch = student.batch;
-        const batchMatch = courseBatch === 'all' || courseBatch === studentBatch;
+if (!fullStudent) {
+    return res.status(404).json({
+        success: false,
+        error: "Student not found"
+    });
+}
 
-        // Check if student has this course as an approved elective
-        const isElective = student.electiveCourses?.some(
-            ec => ec.toString() === course._id.toString()
-        );
+// Check assigned courses
+const isAssigned = fullStudent.assignedCourses.some(
+    courseId => courseId.toString() === course._id.toString()
+);
 
-        // Student is eligible if:
-        // 1. Branch and year match AND batch is compatible, OR
-        // 2. The course is in their approved electiveCourses
-        const isEligible = (branchMatch && yearMatch && batchMatch) || isElective;
+// Check approved electives
+const isElective = fullStudent.electiveCourses.some(
+    courseId => courseId.toString() === course._id.toString()
+);
 
-        if (!isEligible) {
-            console.log('Eligibility check failed:', {
-                studentBranchCode,
-                courseBranchCode,
-                branchMatch,
-                studentYear: academicState?.year,
-                courseYear: course.year,
-                yearMatch,
-                studentBatch: student.batch,
-                courseBatch: course.batch,
-                batchMatch,
-                isElective,
-                electiveCourses: student.electiveCourses
-            });
+if (!isAssigned && !isElective) {
+    await logAudit("ATTENDANCE_FAILED", {
+        userId: student._id,
+        userEmail: student.email,
+        sessionId: session._id,
+        courseId: course._id,
+        failureReason: "Student not enrolled in course",
+        failureCode: "COURSE_NOT_ASSIGNED",
+        ipAddress
+    });
 
-            await logAudit('ATTENDANCE_FAILED', {
-                userId: student._id,
-                userEmail: student.email,
-                sessionId: session._id,
-                courseId: course._id,
-                failureReason: 'Academic mismatch',
-                failureCode: 'ACADEMIC_MISMATCH',
-                ipAddress,
-                metadata: {
-                    studentBranchCode,
-                    courseBranchCode,
-                    branchMatch,
-                    studentYear: academicState?.year,
-                    courseYear: course.year,
-                    yearMatch,
-                    studentBatch: student.batch,
-                    courseBatch: course.batch,
-                    batchMatch,
-                    isElective
-                }
-            });
+    return res.status(403).json({
+        success: false,
+        error: "You are not enrolled in this course."
+    });
+}
 
-            const batchInfo = course.batch !== 'all' ? ` Batch ${course.batch}` : '';
-            return res.status(403).json({
-                success: false,
-                error: `You are not eligible for this course. Required: ${course.branch?.toUpperCase()} Year ${course.year}${batchInfo}`
-            });
-        }
-        validationResults.academicMatch = true;
+validationResults.academicMatch = true;
 
         // ========================================
         // CHECK 8: Geolocation Validation (V5 - Adaptive Geo-Fencing)
