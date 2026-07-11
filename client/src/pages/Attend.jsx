@@ -71,6 +71,12 @@ const Attend = () => {
         fetchSessionInfo();
     }, [sessionId, qrToken]);
 
+    useEffect(() => {
+        if (step === "location") {
+            requestLocation();
+        }
+    }, [step, requestLocation]);
+
     // Fetch session info
     const fetchSessionInfo = async () => {
         try {
@@ -83,7 +89,7 @@ const Attend = () => {
 
             setSessionInfo(res.data.data);
             setStep('location');
-            setStatusMsg('Session verified. Please share your location.');
+            setStatusMsg('Getting your location...');
 
         } catch (error) {
             setStep('error');
@@ -112,7 +118,8 @@ const Attend = () => {
     }, []);
 
     // V5: Request location with multi-sample collection
-    const requestLocation = () => {
+    const requestLocation = useCallback(() => {
+        console.log("requestLocation called");
         setLocationStatus('📡 Acquiring GPS signal...');
 
         if (!navigator.geolocation) {
@@ -215,7 +222,7 @@ const Attend = () => {
                 processLocation(bestSample, samples);
             }
         }, collectionDuration + 500);
-    };
+    },[sessionInfo, calculateDistance]);
 
     // V5: Handle location errors with clear messages
     const handleLocationError = (error) => {
@@ -550,12 +557,16 @@ const Attend = () => {
                 <div className="status-box">
                     {/* Location Request Step */}
                     {step === 'location' && (
-                        <div className="location-step">
-                            <p>Share your location to verify you're in the classroom</p>
-                            <button className="btn btn-primary" onClick={requestLocation}>
-                                📍 Share My Location
-                            </button>
+                        <div className="loading-state">
+                            <div className="spinner"></div>
+                            <p>{locationStatus || "Getting your location..."}</p>
                         </div>
+                        // <div className="location-step">
+                        //     <p>Share your location to verify you're in the classroom</p>
+                        //     <button className="btn btn-primary" onClick={requestLocation}>
+                        //         📍 Share My Location
+                        //     </button>
+                        // </div>
                     )}
 
                     {/* Confirm Step */}
