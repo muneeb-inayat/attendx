@@ -66,776 +66,776 @@ const parseDeviceInfo = (userAgent) => {
  * @desc    Mark attendance with full security chain (Student)
  * @access  Private (Student)
  */
-    export const markAttendance = async (req, res) => {
-        const startTime = Date.now();
-        const student = req.user;
-        const ipAddress = req.ip || req.connection?.remoteAddress;
-        const userAgent = req.headers['user-agent'];
+export const markAttendance = async (req, res) => {
+    const startTime = Date.now();
+    const student = req.user;
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    const userAgent = req.headers['user-agent'];
 
-        // Validation results for audit
-        const validationResults = {
-            tokenValid: false,
-            timeWindowValid: false,
-            locationValid: false,
-            deviceValid: false,
-            academicMatch: false,
-            replayCheckPassed: false,
-            rateLimitPassed: false
-        };
+    // Validation results for audit
+    const validationResults = {
+        tokenValid: false,
+        timeWindowValid: false,
+        locationValid: false,
+        deviceValid: false,
+        academicMatch: false,
+        replayCheckPassed: false,
+        rateLimitPassed: false
+    };
 
-        const securityFlags = [];
-        let suspicionScore = 0;
+    const securityFlags = [];
+    let suspicionScore = 0;
 
-        try {
-            // Extract request data
-            const {
+    try {
+        // Extract request data
+        const {
+            sessionId,
+            token,
+            nonce,
+            timestamp,
+            latitude,
+            longitude,
+            accuracy,
+            altitude,
+            altitudeAccuracy,
+            heading,
+            speed,
+            deviceFingerprint,
+            locationSamples  // Optional: array of location samples for strict mode
+        } = req.body;
+
+        // ========================================
+        // PRE-CHECK: Role Verification
+        // ========================================
+        if (student.role !== 'student') {
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                userRole: student.role,
                 sessionId,
-                token,
-                nonce,
-                timestamp,
-                latitude,
-                longitude,
-                accuracy,
-                altitude,
-                altitudeAccuracy,
-                heading,
-                speed,
-                deviceFingerprint,
-                locationSamples  // Optional: array of location samples for strict mode
-            } = req.body;
-
-            // ========================================
-            // PRE-CHECK: Role Verification
-            // ========================================
-            if (student.role !== 'student') {
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    userRole: student.role,
-                    sessionId,
-                    failureReason: 'Not a student',
-                    failureCode: 'ROLE_MISMATCH',
-                    ipAddress
-                });
-                return res.status(403).json({
-                    success: false,
-                    error: 'Only students can mark attendance'
-                });
-            }
-
-            // ========================================
-            // CHECK 1: Rate Limit / Block Check
-            // ========================================
-            const blockCheck = await isBlocked(student._id.toString());
-            if (blockCheck.blocked) {
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId,
-                    failureReason: 'User blocked',
-                    failureCode: 'BLOCKED_USER',
-                    ipAddress
-                });
-                return res.status(429).json({
-                    success: false,
-                    error: 'Too many failed attempts. Please wait.',
-                    retryAfter: blockCheck.retryAfter
-                });
-            }
-            validationResults.rateLimitPassed = true;
-
-            // ========================================
-            // CHECK 2: Session Validity
-            // ========================================
-            const session = await Session.findById(sessionId).populate('course');
-            if (!session) {
-                await trackFailedAttempt(student._id.toString(), 'SESSION_NOT_FOUND');
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId,
-                    failureReason: 'Session not found',
-                    failureCode: 'SESSION_NOT_FOUND',
-                    ipAddress
-                });
-                return res.status(404).json({
-                    success: false,
-                    error: 'Session not found'
-                });
-            }
-
-            if (!session.isActive) {
-                await trackFailedAttempt(student._id.toString(), 'SESSION_INACTIVE');
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId: session._id,
-                    courseId: session.course._id,
-                    failureReason: 'Session inactive',
-                    failureCode: 'SESSION_INACTIVE',
-                    ipAddress
-                });
-                return res.status(400).json({
-                    success: false,
-                    error: 'Session is no longer active'
-                });
-            }
-
-            const course = session.course;
-
-            // ========================================
-            // CHECK 3: Time Window Validity
-            // ========================================
-            const now = new Date();
-            if (now < session.startTime || now > session.endTime) {
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId: session._id,
-                    failureReason: 'Outside session time window',
-                    failureCode: 'TIME_WINDOW_INVALID',
-                    ipAddress
-                });
-                return res.status(400).json({
-                    success: false,
-                    error: 'Session has ended or not yet started'
-                });
-            }
-            validationResults.timeWindowValid = true;
-
-            // ========================================
-            // CHECK 4: QR Token Validity (Enhanced)
-            // ========================================
-            const tokenValidation = session.isQRTokenValid(token, nonce, timestamp);
-            if (!tokenValidation.valid) {
-                await trackFailedAttempt(student._id.toString(), tokenValidation.reason);
-                await redisService.logSuspiciousActivity(
-                    student._id.toString(),
-                    sessionId,
-                    'INVALID_TOKEN',
-                    { reason: tokenValidation.reason }
-                );
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId: session._id,
-                    failureReason: tokenValidation.reason,
-                    failureCode: tokenValidation.reason,
-                    ipAddress
-                });
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid or expired QR code. Please scan again.'
-                });
-            }
-            validationResults.tokenValid = true;
-
-            // ========================================
-            // CHECK 5: Replay Protection (MongoDB is source of truth)
-            // ========================================
-
-            // DEBUG: Log session IDs to verify they're the same
-            console.log('🔍 ATTENDANCE CHECK DEBUG:', {
-                requestSessionId: sessionId,
-                dbSessionId: session._id.toString(),
-                match: sessionId === session._id.toString(),
-                studentId: student._id.toString(),
-                rollNo: student.rollNo
+                failureReason: 'Not a student',
+                failureCode: 'ROLE_MISMATCH',
+                ipAddress
             });
-
-            // FIRST: Check MongoDB (the source of truth)
-            const alreadyMarkedDB = await Attendance.findOne({
-                session: session._id,
-                student: student._id
+            return res.status(403).json({
+                success: false,
+                error: 'Only students can mark attendance'
             });
+        }
 
-            if (alreadyMarkedDB) {
-                // Detailed debug logging to understand what's happening
-                console.log('❌ BLOCKED BY MONGODB: Already marked!');
-                console.log('   Session ID (from QR):', sessionId);
-                console.log('   Session ID (from DB):', session._id.toString());
-                console.log('   Course:', session.course?.courseName || course?.courseName);
-                console.log('   Course Code:', session.course?.courseCode || course?.courseCode);
-                console.log('   Student:', student.email, student.rollNo);
-                console.log('   Existing record ID:', alreadyMarkedDB._id.toString());
-                console.log('   Existing record timestamp:', alreadyMarkedDB.createdAt);
-                console.log('   Session start time:', session.startTime);
+        // ========================================
+        // CHECK 1: Rate Limit / Block Check
+        // ========================================
+        const blockCheck = await isBlocked(student._id.toString());
+        if (blockCheck.blocked) {
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId,
+                failureReason: 'User blocked',
+                failureCode: 'BLOCKED_USER',
+                ipAddress
+            });
+            return res.status(429).json({
+                success: false,
+                error: 'Too many failed attempts. Please wait.',
+                retryAfter: blockCheck.retryAfter
+            });
+        }
+        validationResults.rateLimitPassed = true;
 
-                // Ensure Redis is in sync
-                await redisService.markAttendanceComplete(session._id.toString(), student._id.toString());
-                await logAudit('ATTENDANCE_FAILED', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId: session._id,
-                    failureReason: 'Already marked (verified in database)',
-                    failureCode: 'ALREADY_MARKED',
-                    ipAddress
-                });
-                return res.status(400).json({
-                    success: false,
-                    error: 'Attendance already marked for this session',
-                    code: 'ALREADY_MARKED',
-                    debug: {
-                        source: 'mongodb',
-                        sessionId: session._id.toString(),
-                        courseName: session.course?.courseName || course?.courseName,
-                        existingRecordAt: alreadyMarkedDB.createdAt,
-                        sessionStartTime: session.startTime
-                    }
-                });
-            }
+        // ========================================
+        // CHECK 2: Session Validity
+        // ========================================
+        const session = await Session.findById(sessionId).populate('course');
+        if (!session) {
+            await trackFailedAttempt(student._id.toString(), 'SESSION_NOT_FOUND');
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId,
+                failureReason: 'Session not found',
+                failureCode: 'SESSION_NOT_FOUND',
+                ipAddress
+            });
+            return res.status(404).json({
+                success: false,
+                error: 'Session not found'
+            });
+        }
 
-            // SECOND: Check Redis (for fast duplicate prevention during same request)
-            // Use session._id consistently for all Redis operations
-            const alreadyMarkedRedis = await redisService.isAttendanceMarked(
-                session._id.toString(),
-                student._id.toString()
+        if (!session.isActive) {
+            await trackFailedAttempt(student._id.toString(), 'SESSION_INACTIVE');
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                courseId: session.course._id,
+                failureReason: 'Session inactive',
+                failureCode: 'SESSION_INACTIVE',
+                ipAddress
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Session is no longer active'
+            });
+        }
+
+        const course = session.course;
+
+        // ========================================
+        // CHECK 3: Time Window Validity
+        // ========================================
+        const now = new Date();
+        if (now < session.startTime || now > session.endTime) {
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                failureReason: 'Outside session time window',
+                failureCode: 'TIME_WINDOW_INVALID',
+                ipAddress
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Session has ended or not yet started'
+            });
+        }
+        validationResults.timeWindowValid = true;
+
+        // ========================================
+        // CHECK 4: QR Token Validity (Enhanced)
+        // ========================================
+        const tokenValidation = session.isQRTokenValid(token, nonce, timestamp);
+        if (!tokenValidation.valid) {
+            await trackFailedAttempt(student._id.toString(), tokenValidation.reason);
+            await redisService.logSuspiciousActivity(
+                student._id.toString(),
+                sessionId,
+                'INVALID_TOKEN',
+                { reason: tokenValidation.reason }
             );
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                failureReason: tokenValidation.reason,
+                failureCode: tokenValidation.reason,
+                ipAddress
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid or expired QR code. Please scan again.'
+            });
+        }
+        validationResults.tokenValid = true;
 
-            if (alreadyMarkedRedis) {
-                // Redis says marked, but MongoDB says NOT marked
-                // This is a STALE REDIS ENTRY from a failed previous attempt
-                // Clear it and allow attendance to proceed!
-                console.log('⚠️ STALE REDIS ENTRY DETECTED! Redis says marked but MongoDB says no.');
-                console.log('🧹 Clearing stale Redis entry for sessionId:', sessionId);
+        // ========================================
+        // CHECK 5: Replay Protection (MongoDB is source of truth)
+        // ========================================
 
-                try {
-                    // Delete the stale Redis entry using the proper method
-                    await redisService.clearAttendanceMark(session._id.toString(), student._id.toString());
-                    console.log('✅ Stale Redis entry cleared, proceeding with attendance');
-                } catch (redisError) {
-                    console.error('Failed to clear stale Redis entry:', redisError.message);
-                    // Continue anyway - MongoDB is the source of truth
+        // DEBUG: Log session IDs to verify they're the same
+        console.log('🔍 ATTENDANCE CHECK DEBUG:', {
+            requestSessionId: sessionId,
+            dbSessionId: session._id.toString(),
+            match: sessionId === session._id.toString(),
+            studentId: student._id.toString(),
+            rollNo: student.rollNo
+        });
+
+        // FIRST: Check MongoDB (the source of truth)
+        const alreadyMarkedDB = await Attendance.findOne({
+            session: session._id,
+            student: student._id
+        });
+
+        if (alreadyMarkedDB) {
+            // Detailed debug logging to understand what's happening
+            console.log('❌ BLOCKED BY MONGODB: Already marked!');
+            console.log('   Session ID (from QR):', sessionId);
+            console.log('   Session ID (from DB):', session._id.toString());
+            console.log('   Course:', session.course?.courseName || course?.courseName);
+            console.log('   Course Code:', session.course?.courseCode || course?.courseCode);
+            console.log('   Student:', student.email, student.rollNo);
+            console.log('   Existing record ID:', alreadyMarkedDB._id.toString());
+            console.log('   Existing record timestamp:', alreadyMarkedDB.createdAt);
+            console.log('   Session start time:', session.startTime);
+
+            // Ensure Redis is in sync
+            await redisService.markAttendanceComplete(session._id.toString(), student._id.toString());
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                failureReason: 'Already marked (verified in database)',
+                failureCode: 'ALREADY_MARKED',
+                ipAddress
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Attendance already marked for this session',
+                code: 'ALREADY_MARKED',
+                debug: {
+                    source: 'mongodb',
+                    sessionId: session._id.toString(),
+                    courseName: session.course?.courseName || course?.courseName,
+                    existingRecordAt: alreadyMarkedDB.createdAt,
+                    sessionStartTime: session.startTime
                 }
+            });
+        }
+
+        // SECOND: Check Redis (for fast duplicate prevention during same request)
+        // Use session._id consistently for all Redis operations
+        const alreadyMarkedRedis = await redisService.isAttendanceMarked(
+            session._id.toString(),
+            student._id.toString()
+        );
+
+        if (alreadyMarkedRedis) {
+            // Redis says marked, but MongoDB says NOT marked
+            // This is a STALE REDIS ENTRY from a failed previous attempt
+            // Clear it and allow attendance to proceed!
+            console.log('⚠️ STALE REDIS ENTRY DETECTED! Redis says marked but MongoDB says no.');
+            console.log('🧹 Clearing stale Redis entry for sessionId:', sessionId);
+
+            try {
+                // Delete the stale Redis entry using the proper method
+                await redisService.clearAttendanceMark(session._id.toString(), student._id.toString());
+                console.log('✅ Stale Redis entry cleared, proceeding with attendance');
+            } catch (redisError) {
+                console.error('Failed to clear stale Redis entry:', redisError.message);
+                // Continue anyway - MongoDB is the source of truth
             }
+        }
 
-            validationResults.replayCheckPassed = true;
+        validationResults.replayCheckPassed = true;
 
-            // Check if specific token/nonce was already used
-            // Use session._id (validated) instead of request sessionId for consistency
-            if (nonce) {
-                const tokenUsed = await redisService.isTokenUsed(session._id.toString(), nonce);
-                if (tokenUsed) {
-                    securityFlags.push('TOKEN_REPLAY_ATTEMPT');
-                    suspicionScore += 30;
-                    await redisService.logSuspiciousActivity(
-                        student._id.toString(),
-                        session._id.toString(),
-                        'TOKEN_REPLAY',
-                        { nonce }
-                    );
-                }
-            }
-
-            // ========================================
-            // CHECK 6: Device Fingerprint Validation
-            // ========================================
-            if (!deviceFingerprint || !isValidFingerprint(deviceFingerprint)) {
-                await trackFailedAttempt(student._id.toString(), 'INVALID_DEVICE');
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid device information'
-                });
-            }
-
-            const deviceHash = hashDeviceFingerprint(deviceFingerprint);
-            const { deviceType, browser, os } = parseDeviceInfo(userAgent);
-
-            // Check device in current session (prevent device sharing)
-            if (session.deviceBinding) {
-                const deviceUsedInSession = await Attendance.findOne({
-                    session: session._id,
-                    deviceHash,
-                    student: { $ne: student._id }
-                });
-
-                if (deviceUsedInSession) {
-                    securityFlags.push('SHARED_DEVICE');
-                    suspicionScore += 40;
-                    await redisService.logSuspiciousActivity(
-                        student._id.toString(),
-                        sessionId,
-                        'DEVICE_ALREADY_USED',
-                        { deviceHash, otherStudent: deviceUsedInSession.student }
-                    );
-                    await logAudit('ATTENDANCE_FAILED', {
-                        userId: student._id,
-                        userEmail: student.email,
-                        sessionId: session._id,
-                        deviceHash,
-                        failureReason: 'Device used by another student in this session',
-                        failureCode: 'DEVICE_ALREADY_USED',
-                        ipAddress
-                    });
-                    return res.status(409).json({
-                        success: false,
-                        error: 'This device has already been used by another student in this session',
-                        code: 'DEVICE_ALREADY_USED'
-                    });
-                }
-            }
-
-            // ========================================
-            // CHECK 6b: Cross-Session Device Sharing (V5 Enhancement)
-            // Detect if this device has been used by OTHER students in ANY session
-            // ========================================
-            const deviceUsersGlobal = await DeviceRegistry.getDeviceUsers(deviceHash);
-            const otherUsersOfDevice = deviceUsersGlobal.filter(
-                d => d.student && d.student._id.toString() !== student._id.toString()
-            );
-
-            if (otherUsersOfDevice.length > 0) {
-                // This device is registered to multiple students!
-                securityFlags.push('MULTI_STUDENT_DEVICE');
+        // Check if specific token/nonce was already used
+        // Use session._id (validated) instead of request sessionId for consistency
+        if (nonce) {
+            const tokenUsed = await redisService.isTokenUsed(session._id.toString(), nonce);
+            if (tokenUsed) {
+                securityFlags.push('TOKEN_REPLAY_ATTEMPT');
                 suspicionScore += 30;
+                await redisService.logSuspiciousActivity(
+                    student._id.toString(),
+                    session._id.toString(),
+                    'TOKEN_REPLAY',
+                    { nonce }
+                );
+            }
+        }
 
+        // ========================================
+        // CHECK 6: Device Fingerprint Validation
+        // ========================================
+        if (!deviceFingerprint || !isValidFingerprint(deviceFingerprint)) {
+            await trackFailedAttempt(student._id.toString(), 'INVALID_DEVICE');
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid device information'
+            });
+        }
+
+        const deviceHash = hashDeviceFingerprint(deviceFingerprint);
+        const { deviceType, browser, os } = parseDeviceInfo(userAgent);
+
+        // Check device in current session (prevent device sharing)
+        if (session.deviceBinding) {
+            const deviceUsedInSession = await Attendance.findOne({
+                session: session._id,
+                deviceHash,
+                student: { $ne: student._id }
+            });
+
+            if (deviceUsedInSession) {
+                securityFlags.push('SHARED_DEVICE');
+                suspicionScore += 40;
                 await redisService.logSuspiciousActivity(
                     student._id.toString(),
                     sessionId,
-                    'DEVICE_SHARED_ACROSS_ACCOUNTS',
-                    {
-                        deviceHash,
-                        otherStudents: otherUsersOfDevice.map(d => ({
-                            id: d.student._id,
-                            rollNo: d.student.rollNo,
-                            name: d.student.name
-                        }))
-                    }
+                    'DEVICE_ALREADY_USED',
+                    { deviceHash, otherStudent: deviceUsedInSession.student }
                 );
-
-                await logAudit('SECURITY_WARNING', {
-                    userId: student._id,
-                    userEmail: student.email,
-                    sessionId: session._id,
-                    deviceHash,
-                    warningType: 'DEVICE_SHARED_ACROSS_ACCOUNTS',
-                    otherStudentsCount: otherUsersOfDevice.length,
-                    otherStudents: otherUsersOfDevice.map(d => d.student?.rollNo),
-                    ipAddress
-                });
-
-                // In strict or paranoid mode, BLOCK the attendance
-                if (session.securityLevel === 'strict' || session.securityLevel === 'paranoid') {
-                    return res.status(409).json({
-                        success: false,
-                        error: 'This device is registered to another student. Please use your own device.',
-                        code: 'DEVICE_OWNERSHIP_CONFLICT'
-                    });
-                }
-                // In standard mode, allow but flag for review
-            }
-
-            // Register/validate device for student
-            const deviceResult = await DeviceRegistry.registerDevice(student._id, {
-                deviceHash,
-                fingerprintComponents: req.body.fingerprintComponents || {},
-                deviceType,
-                browser,
-                os,
-                ip: ipAddress,
-                location: { latitude, longitude }
-            });
-
-            if (!deviceResult.success) {
-                securityFlags.push('TOO_MANY_DEVICES');
-                suspicionScore += 20;
                 await logAudit('ATTENDANCE_FAILED', {
                     userId: student._id,
                     userEmail: student.email,
                     sessionId: session._id,
                     deviceHash,
-                    failureReason: deviceResult.message,
-                    failureCode: 'TOO_MANY_DEVICES',
+                    failureReason: 'Device used by another student in this session',
+                    failureCode: 'DEVICE_ALREADY_USED',
                     ipAddress
                 });
-                // Don't fail - just flag it
-            }
-
-            if (deviceResult.isNew) {
-                securityFlags.push('DEVICE_SWITCHING');
-                suspicionScore += 10;
-                await redisService.incrementDeviceSwitches(student._id.toString());
-            }
-            validationResults.deviceValid = true;
-
-    // ========================================
-    // CHECK 7: Academic Eligibility
-    // ========================================
-
-    // Reload full student document with course assignments
-    const fullStudent = await User.findById(student._id)
-        .select("assignedCourses electiveCourses");
-
-    if (!fullStudent) {
-        return res.status(404).json({
-            success: false,
-            error: "Student not found"
-        });
-    }
-
-    console.log("========== STUDENT DEBUG ==========");
-    console.log("Student:", student.email);
-    console.log("Course:", course.courseName);
-    console.log("Course ID:", course._id.toString());
-
-    console.log(
-        "Assigned Courses:",
-        fullStudent.assignedCourses.map(id => id.toString())
-    );
-
-    console.log(
-        "Elective Courses:",
-        fullStudent.electiveCourses.map(id => id.toString())
-    );
-
-    console.log(
-        "isAssigned:",
-        fullStudent.assignedCourses.some(
-            id => id.toString() === course._id.toString()
-        )
-    );
-
-    console.log(
-        "isElective:",
-        fullStudent.electiveCourses.some(
-            id => id.toString() === course._id.toString()
-        )
-    );
-    console.log("==================================");
-
-    // Check assigned courses
-    const isAssigned = fullStudent.assignedCourses.some(
-        courseId => courseId.toString() === course._id.toString()
-    );
-
-    // Check approved electives
-    const isElective = fullStudent.electiveCourses.some(
-        courseId => courseId.toString() === course._id.toString()
-    );
-
-    if (!isAssigned && !isElective) {
-        await logAudit("ATTENDANCE_FAILED", {
-            userId: student._id,
-            userEmail: student.email,
-            sessionId: session._id,
-            courseId: course._id,
-            failureReason: "Student not enrolled in course",
-            failureCode: "COURSE_NOT_ASSIGNED",
-            ipAddress
-        });
-
-        return res.status(403).json({
-            success: false,
-            error: "You are not enrolled in this course."
-        });
-    }
-
-    validationResults.academicMatch = true;
-
-            // ========================================
-            // CHECK 8: Geolocation Validation (V5 - Adaptive Geo-Fencing)
-            // ========================================
-            if (session.locationBinding) {
-                const locationValidation = validateLocation({
-                    studentLocation: {
-                        latitude,
-                        longitude,
-                        accuracy,
-                        altitude,
-                        altitudeAccuracy,
-                        heading,
-                        speed,
-                        timestamp: Date.now()
-                    },
-                    sessionLocation: {
-                        centerLat: session.centerLat,
-                        centerLng: session.centerLng,
-                        radius: session.radius,
-                        requiredAccuracy: session.requiredAccuracy,
-                        // V5: Pass adaptive geo configuration with updated defaults
-                        adaptiveGeo: session.adaptiveGeo || {
-                            enabled: true,
-                            baseRadius: 50,
-                            maxRadius: 400,  // Increased for indoor GPS
-                            accuracyMultiplier: 1.0
-                        }
-                    },
-                    strictMode: session.securityLevel === 'strict' || session.securityLevel === 'paranoid',
-                    deviceType  // V5: Pass device type for adaptive radius
+                return res.status(409).json({
+                    success: false,
+                    error: 'This device has already been used by another student in this session',
+                    code: 'DEVICE_ALREADY_USED'
                 });
+            }
+        }
 
-                // Debug logging for location validation
-                console.log('Location validation result:', {
-                    studentEmail: student.email,
-                    sessionId: session._id,
-                    sessionRadius: session.radius,
-                    studentLocation: { latitude, longitude, accuracy },
-                    sessionLocation: { lat: session.centerLat, lng: session.centerLng },
-                    distance: locationValidation.distance,
-                    effectiveRadius: locationValidation.allowedRadius,
-                    valid: locationValidation.valid,
-                    radiusDetails: locationValidation.details?.distance?.radiusDetails
+        // ========================================
+        // CHECK 6b: Cross-Session Device Sharing (V5 Enhancement)
+        // Detect if this device has been used by OTHER students in ANY session
+        // ========================================
+        const deviceUsersGlobal = await DeviceRegistry.getDeviceUsers(deviceHash);
+        const otherUsersOfDevice = deviceUsersGlobal.filter(
+            d => d.student && d.student._id.toString() !== student._id.toString()
+        );
+
+        if (otherUsersOfDevice.length > 0) {
+            // This device is registered to multiple students!
+            securityFlags.push('MULTI_STUDENT_DEVICE');
+            suspicionScore += 30;
+
+            await redisService.logSuspiciousActivity(
+                student._id.toString(),
+                sessionId,
+                'DEVICE_SHARED_ACROSS_ACCOUNTS',
+                {
+                    deviceHash,
+                    otherStudents: otherUsersOfDevice.map(d => ({
+                        id: d.student._id,
+                        rollNo: d.student.rollNo,
+                        name: d.student.name
+                    }))
+                }
+            );
+
+            await logAudit('SECURITY_WARNING', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                deviceHash,
+                warningType: 'DEVICE_SHARED_ACROSS_ACCOUNTS',
+                otherStudentsCount: otherUsersOfDevice.length,
+                otherStudents: otherUsersOfDevice.map(d => d.student?.rollNo),
+                ipAddress
+            });
+
+            // In strict or paranoid mode, BLOCK the attendance
+            if (session.securityLevel === 'strict' || session.securityLevel === 'paranoid') {
+                return res.status(409).json({
+                    success: false,
+                    error: 'This device is registered to another student. Please use your own device.',
+                    code: 'DEVICE_OWNERSHIP_CONFLICT'
                 });
-
-                // Add location security flags
-                if (locationValidation.flags?.length > 0) {
-                    securityFlags.push(...locationValidation.flags);
-                    suspicionScore += locationValidation.details?.spoofing?.score || 0;
-                }
-
-                if (locationValidation.details?.distance?.nearEdge) {
-                    securityFlags.push('NEAR_EDGE');
-                }
-
-                // V5: Flag extended allowance (allowed due to GPS accuracy compensation)
-                if (locationValidation.details?.distance?.extendedAllowance) {
-                    securityFlags.push('EXTENDED_ALLOWANCE');
-                }
-
-                if (!locationValidation.valid) {
-                    await trackFailedAttempt(student._id.toString(), 'LOCATION_INVALID');
-
-                    console.warn('Location validation FAILED:', {
-                        studentEmail: student.email,
-                        distance: locationValidation.distance,
-                        allowedRadius: locationValidation.allowedRadius,
-                        sessionRadius: session.radius,
-                        gpsAccuracy: accuracy
-                    });
-
-                    await logAudit('ATTENDANCE_FAILED', {
-                        userId: student._id,
-                        userEmail: student.email,
-                        sessionId: session._id,
-                        location: { latitude, longitude, accuracy },
-                        distanceFromCenter: locationValidation.distance,
-                        allowedRadius: locationValidation.allowedRadius || session.radius,
-                        failureReason: locationValidation.error,
-                        failureCode: 'LOCATION_OUT_OF_RANGE',
-                        securityFlags,
-                        ipAddress
-                    });
-
-                    // Store failed attempt in database for professor review
-                    try {
-                        await FailedAttempt.create({
-                            session: session._id,
-                            student: student._id,
-                            studentName: student.name,
-                            rollNo: student.rollNo,
-                            failureReason: 'LOCATION_TOO_FAR',
-                            failureMessage: `Distance: ${Math.round(locationValidation.distance)}m, Allowed: ${locationValidation.allowedRadius || session.radius}m`,
-                            location: { latitude, longitude, accuracy },
-                            distance: locationValidation.distance,
-                            deviceFingerprint: deviceHash,
-                            deviceType,
-                            status: 'PENDING'
-                        });
-                    } catch (err) {
-                        console.error('Failed to store failed attempt:', err.message);
-                    }
-
-                    // V5: User-friendly error message
-                    return res.status(400).json({
-                        success: false,
-                        error: locationValidation.error || 'Location verification failed',
-                        distance: locationValidation.distance,
-                        allowedRadius: locationValidation.allowedRadius || session.radius,
-                        hint: `Please move closer to the classroom. You need to be within ${locationValidation.allowedRadius || session.radius}m of the session location.`,
-                        failedAttemptSaved: true
-                    });
-                }
-
-                // Check for spoofing suspicion
-                if (locationValidation.suspicious) {
-                    securityFlags.push('SUSPICIOUS_LOCATION');
-                    suspicionScore += 25;
-                    await redisService.logSuspiciousActivity(
-                        student._id.toString(),
-                        sessionId,
-                        'LOCATION_SPOOFING_SUSPECTED',
-                        { flags: locationValidation.flags }
-                    );
-                }
             }
-            validationResults.locationValid = true;
+            // In standard mode, allow but flag for review
+        }
 
-            // Calculate distance for record
-            const distance = calculateDistance(latitude, longitude, session.centerLat, session.centerLng);
+        // Register/validate device for student
+        const deviceResult = await DeviceRegistry.registerDevice(student._id, {
+            deviceHash,
+            fingerprintComponents: req.body.fingerprintComponents || {},
+            deviceType,
+            browser,
+            os,
+            ip: ipAddress,
+            location: { latitude, longitude }
+        });
 
-            // ========================================
-            // ALL CHECKS PASSED - Create Attendance Record
-            // ========================================
+        if (!deviceResult.success) {
+            securityFlags.push('TOO_MANY_DEVICES');
+            suspicionScore += 20;
+            await logAudit('ATTENDANCE_FAILED', {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                deviceHash,
+                failureReason: deviceResult.message,
+                failureCode: 'TOO_MANY_DEVICES',
+                ipAddress
+            });
+            // Don't fail - just flag it
+        }
 
-            // Determine status
-            const minutesLate = (now - session.startTime) / 60000;
-            let status = 'PRESENT';
-            if (minutesLate > session.lateThreshold) {
-                status = 'LATE';
-            }
-            if (suspicionScore >= 50) {
-                status = 'SUSPICIOUS';
-            }
+        if (deviceResult.isNew) {
+            securityFlags.push('DEVICE_SWITCHING');
+            suspicionScore += 10;
+            await redisService.incrementDeviceSwitches(student._id.toString());
+        }
+        validationResults.deviceValid = true;
 
-            // ========================================
-            // IMPORTANT: Create MongoDB record FIRST, then mark Redis
-            // This ensures that if MongoDB fails, Redis doesn't block retries
-            // ========================================
+        // ========================================
+        // CHECK 7: Academic Eligibility
+        // ========================================
 
-            // Create attendance record in MongoDB FIRST
-            const attendance = await Attendance.create({
-                session: session._id,
-                student: student._id,
-                studentName: student.name,
-                rollNo: student.rollNo,
-                status,
-                timestamp: now,
-                minutesAfterStart: Math.round(minutesLate),
-                location: {
+        // Reload full student document with course assignments
+        const fullStudent = await User.findById(student._id)
+            .select("assignedCourses electiveCourses");
+
+        if (!fullStudent) {
+            return res.status(404).json({
+                success: false,
+                error: "Student not found"
+            });
+        }
+
+        console.log("========== STUDENT DEBUG ==========");
+        console.log("Student:", student.email);
+        console.log("Course:", course.courseName);
+        console.log("Course ID:", course._id.toString());
+
+        console.log(
+            "Assigned Courses:",
+            fullStudent.assignedCourses.map(id => id.toString())
+        );
+
+        console.log(
+            "Elective Courses:",
+            fullStudent.electiveCourses.map(id => id.toString())
+        );
+
+        console.log(
+            "isAssigned:",
+            fullStudent.assignedCourses.some(
+                id => id.toString() === course._id.toString()
+            )
+        );
+
+        console.log(
+            "isElective:",
+            fullStudent.electiveCourses.some(
+                id => id.toString() === course._id.toString()
+            )
+        );
+        console.log("==================================");
+
+        // Check assigned courses
+        const isAssigned = fullStudent.assignedCourses.some(
+            courseId => courseId.toString() === course._id.toString()
+        );
+
+        // Check approved electives
+        const isElective = fullStudent.electiveCourses.some(
+            courseId => courseId.toString() === course._id.toString()
+        );
+
+        if (!isAssigned && !isElective) {
+            await logAudit("ATTENDANCE_FAILED", {
+                userId: student._id,
+                userEmail: student.email,
+                sessionId: session._id,
+                courseId: course._id,
+                failureReason: "Student not enrolled in course",
+                failureCode: "COURSE_NOT_ASSIGNED",
+                ipAddress
+            });
+
+            return res.status(403).json({
+                success: false,
+                error: "You are not enrolled in this course."
+            });
+        }
+
+        validationResults.academicMatch = true;
+
+        // ========================================
+        // CHECK 8: Geolocation Validation (V5 - Adaptive Geo-Fencing)
+        // ========================================
+        if (session.locationBinding) {
+            const locationValidation = validateLocation({
+                studentLocation: {
                     latitude,
                     longitude,
                     accuracy,
                     altitude,
                     altitudeAccuracy,
                     heading,
-                    speed
+                    speed,
+                    timestamp: Date.now()
                 },
-                latitude,
-                longitude,
-                distance: Math.round(distance),
-                deviceFingerprint,
-                deviceHash,
-                deviceType,
-                userAgent,
-                browser,
-                os,
-                ipAddress,
-                tokenNonce: nonce,
-                tokenTimestamp: timestamp,
-                validation: validationResults,
-                securityFlags,
-                suspicionScore,
-                markedBy: 'self'
+                sessionLocation: {
+                    centerLat: session.centerLat,
+                    centerLng: session.centerLng,
+                    radius: session.radius,
+                    requiredAccuracy: session.requiredAccuracy,
+                    // V5: Pass adaptive geo configuration with updated defaults
+                    adaptiveGeo: session.adaptiveGeo || {
+                        enabled: true,
+                        baseRadius: 50,
+                        maxRadius: 400,  // Increased for indoor GPS
+                        accuracyMultiplier: 1.0
+                    }
+                },
+                strictMode: session.securityLevel === 'strict' || session.securityLevel === 'paranoid',
+                deviceType  // V5: Pass device type for adaptive radius
             });
 
-            // ONLY mark in Redis AFTER successful MongoDB save
-            // This prevents the "already marked" error on retry if MongoDB fails
-            // Use session._id consistently for all Redis operations
-            await redisService.markAttendanceComplete(session._id.toString(), student._id.toString());
-            if (nonce) {
-                await redisService.markTokenUsed(session._id.toString(), nonce, student._id.toString());
+            // Debug logging for location validation
+            console.log('Location validation result:', {
+                studentEmail: student.email,
+                sessionId: session._id,
+                sessionRadius: session.radius,
+                studentLocation: { latitude, longitude, accuracy },
+                sessionLocation: { lat: session.centerLat, lng: session.centerLng },
+                distance: locationValidation.distance,
+                effectiveRadius: locationValidation.allowedRadius,
+                valid: locationValidation.valid,
+                radiusDetails: locationValidation.details?.distance?.radiusDetails
+            });
+
+            // Add location security flags
+            if (locationValidation.flags?.length > 0) {
+                securityFlags.push(...locationValidation.flags);
+                suspicionScore += locationValidation.details?.spoofing?.score || 0;
             }
 
-            // Update session attendance count
-            await Session.findByIdAndUpdate(session._id, {
-                $inc: { attendanceCount: 1 },
-                lastAttendanceAt: now
-            });
+            if (locationValidation.details?.distance?.nearEdge) {
+                securityFlags.push('NEAR_EDGE');
+            }
 
-            // Log successful attendance
-            await logAudit('ATTENDANCE_SUCCESS', {
-                userId: student._id,
-                userEmail: student.email,
-                userRole: 'student',
-                sessionId: session._id,
-                courseId: course._id,
-                deviceHash,
-                location: { latitude, longitude, accuracy },
-                distanceFromCenter: Math.round(distance),
-                allowedRadius: session.radius,
-                validationResult: 'PASSED',
-                validationDetails: validationResults,
-                securityFlags,
-                ipAddress,
-                metadata: {
-                    processingTime: Date.now() - startTime,
-                    status,
-                    minutesLate: Math.round(minutesLate)
+            // V5: Flag extended allowance (allowed due to GPS accuracy compensation)
+            if (locationValidation.details?.distance?.extendedAllowance) {
+                securityFlags.push('EXTENDED_ALLOWANCE');
+            }
+
+            if (!locationValidation.valid) {
+                await trackFailedAttempt(student._id.toString(), 'LOCATION_INVALID');
+
+                console.warn('Location validation FAILED:', {
+                    studentEmail: student.email,
+                    distance: locationValidation.distance,
+                    allowedRadius: locationValidation.allowedRadius,
+                    sessionRadius: session.radius,
+                    gpsAccuracy: accuracy
+                });
+
+                await logAudit('ATTENDANCE_FAILED', {
+                    userId: student._id,
+                    userEmail: student.email,
+                    sessionId: session._id,
+                    location: { latitude, longitude, accuracy },
+                    distanceFromCenter: locationValidation.distance,
+                    allowedRadius: locationValidation.allowedRadius || session.radius,
+                    failureReason: locationValidation.error,
+                    failureCode: 'LOCATION_OUT_OF_RANGE',
+                    securityFlags,
+                    ipAddress
+                });
+
+                // Store failed attempt in database for professor review
+                try {
+                    await FailedAttempt.create({
+                        session: session._id,
+                        student: student._id,
+                        studentName: student.name,
+                        rollNo: student.rollNo,
+                        failureReason: 'LOCATION_TOO_FAR',
+                        failureMessage: `Distance: ${Math.round(locationValidation.distance)}m, Allowed: ${locationValidation.allowedRadius || session.radius}m`,
+                        location: { latitude, longitude, accuracy },
+                        distance: locationValidation.distance,
+                        deviceFingerprint: deviceHash,
+                        deviceType,
+                        status: 'PENDING'
+                    });
+                } catch (err) {
+                    console.error('Failed to store failed attempt:', err.message);
                 }
-            });
 
-            // Decrease device trust if suspicious
-            if (suspicionScore > 0) {
-                await DeviceRegistry.decreaseTrust(
-                    student._id,
-                    deviceHash,
-                    Math.min(suspicionScore / 5, 20),
-                    `Attendance with suspicion score ${suspicionScore}`
+                // V5: User-friendly error message
+                return res.status(400).json({
+                    success: false,
+                    error: locationValidation.error || 'Location verification failed',
+                    distance: locationValidation.distance,
+                    allowedRadius: locationValidation.allowedRadius || session.radius,
+                    hint: `Please move closer to the classroom. You need to be within ${locationValidation.allowedRadius || session.radius}m of the session location.`,
+                    failedAttemptSaved: true
+                });
+            }
+
+            // Check for spoofing suspicion
+            if (locationValidation.suspicious) {
+                securityFlags.push('SUSPICIOUS_LOCATION');
+                suspicionScore += 25;
+                await redisService.logSuspiciousActivity(
+                    student._id.toString(),
+                    sessionId,
+                    'LOCATION_SPOOFING_SUSPECTED',
+                    { flags: locationValidation.flags }
                 );
             }
+        }
+        validationResults.locationValid = true;
 
-            // Response
-            res.json({
-                success: true,
-                message: status === 'LATE'
-                    ? `Marked as LATE (${Math.round(minutesLate)} min after start)`
-                    : 'Attendance marked successfully',
-                data: {
-                    status,
-                    timestamp: now,
-                    distance: Math.round(distance),
-                    course: course.courseName,
-                    sessionId: session.sessionId
-                }
-            });
+        // Calculate distance for record
+        const distance = calculateDistance(latitude, longitude, session.centerLat, session.centerLng);
 
-        } catch (error) {
-            console.error('Mark Attendance Error:', error);
+        // ========================================
+        // ALL CHECKS PASSED - Create Attendance Record
+        // ========================================
 
-            // Log error
-            await logAudit('ATTENDANCE_FAILED', {
-                userId: student?._id,
-                userEmail: student?.email,
-                sessionId: req.body?.sessionId,
-                failureReason: error.message,
-                failureCode: 'INTERNAL_ERROR',
-                ipAddress,
-                validationDetails: validationResults
-            });
+        // Determine status
+        const minutesLate = (now - session.startTime) / 60000;
+        let status = 'PRESENT';
+        if (minutesLate > session.lateThreshold) {
+            status = 'LATE';
+        }
+        if (suspicionScore >= 50) {
+            status = 'SUSPICIOUS';
+        }
 
-            // Handle duplicate key error (race condition - attendance exists in MongoDB)
-            if (error.code === 11000) {
-                // Also update Redis for consistency
-                try {
-                    await redisService.markAttendanceComplete(req.body?.sessionId, student._id.toString());
-                } catch (redisErr) {
-                    // Ignore Redis errors here
-                }
-                return res.status(400).json({
-                    success: false,
-                    error: 'Attendance already marked for this session',
-                    code: 'ALREADY_MARKED'
-                });
+        // ========================================
+        // IMPORTANT: Create MongoDB record FIRST, then mark Redis
+        // This ensures that if MongoDB fails, Redis doesn't block retries
+        // ========================================
+
+        // Create attendance record in MongoDB FIRST
+        const attendance = await Attendance.create({
+            session: session._id,
+            student: student._id,
+            studentName: student.name,
+            rollNo: student.rollNo,
+            status,
+            timestamp: now,
+            minutesAfterStart: Math.round(minutesLate),
+            location: {
+                latitude,
+                longitude,
+                accuracy,
+                altitude,
+                altitudeAccuracy,
+                heading,
+                speed
+            },
+            latitude,
+            longitude,
+            distance: Math.round(distance),
+            deviceFingerprint,
+            deviceHash,
+            deviceType,
+            userAgent,
+            browser,
+            os,
+            ipAddress,
+            tokenNonce: nonce,
+            tokenTimestamp: timestamp,
+            validation: validationResults,
+            securityFlags,
+            suspicionScore,
+            markedBy: 'self'
+        });
+
+        // ONLY mark in Redis AFTER successful MongoDB save
+        // This prevents the "already marked" error on retry if MongoDB fails
+        // Use session._id consistently for all Redis operations
+        await redisService.markAttendanceComplete(session._id.toString(), student._id.toString());
+        if (nonce) {
+            await redisService.markTokenUsed(session._id.toString(), nonce, student._id.toString());
+        }
+
+        // Update session attendance count
+        await Session.findByIdAndUpdate(session._id, {
+            $inc: { attendanceCount: 1 },
+            lastAttendanceAt: now
+        });
+
+        // Log successful attendance
+        await logAudit('ATTENDANCE_SUCCESS', {
+            userId: student._id,
+            userEmail: student.email,
+            userRole: 'student',
+            sessionId: session._id,
+            courseId: course._id,
+            deviceHash,
+            location: { latitude, longitude, accuracy },
+            distanceFromCenter: Math.round(distance),
+            allowedRadius: session.radius,
+            validationResult: 'PASSED',
+            validationDetails: validationResults,
+            securityFlags,
+            ipAddress,
+            metadata: {
+                processingTime: Date.now() - startTime,
+                status,
+                minutesLate: Math.round(minutesLate)
             }
+        });
 
-            // Handle validation errors
-            if (error.name === 'ValidationError') {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid data provided: ' + Object.values(error.errors).map(e => e.message).join(', '),
-                    code: 'VALIDATION_ERROR'
-                });
+        // Decrease device trust if suspicious
+        if (suspicionScore > 0) {
+            await DeviceRegistry.decreaseTrust(
+                student._id,
+                deviceHash,
+                Math.min(suspicionScore / 5, 20),
+                `Attendance with suspicion score ${suspicionScore}`
+            );
+        }
+
+        // Response
+        res.json({
+            success: true,
+            message: status === 'LATE'
+                ? `Marked as LATE (${Math.round(minutesLate)} min after start)`
+                : 'Attendance marked successfully',
+            data: {
+                status,
+                timestamp: now,
+                distance: Math.round(distance),
+                course: course.courseName,
+                sessionId: session.sessionId
             }
+        });
 
-            // Handle MongoDB connection errors
-            if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
-                return res.status(503).json({
-                    success: false,
-                    error: 'Database temporarily unavailable. Please try again in a few seconds.',
-                    code: 'DATABASE_ERROR',
-                    retryAfter: 5
-                });
+    } catch (error) {
+        console.error('Mark Attendance Error:', error);
+
+        // Log error
+        await logAudit('ATTENDANCE_FAILED', {
+            userId: student?._id,
+            userEmail: student?.email,
+            sessionId: req.body?.sessionId,
+            failureReason: error.message,
+            failureCode: 'INTERNAL_ERROR',
+            ipAddress,
+            validationDetails: validationResults
+        });
+
+        // Handle duplicate key error (race condition - attendance exists in MongoDB)
+        if (error.code === 11000) {
+            // Also update Redis for consistency
+            try {
+                await redisService.markAttendanceComplete(req.body?.sessionId, student._id.toString());
+            } catch (redisErr) {
+                // Ignore Redis errors here
             }
-
-            // Default error - provide more context
-            res.status(500).json({
+            return res.status(400).json({
                 success: false,
-                error: 'Server error while marking attendance. Please try again.',
-                code: 'INTERNAL_ERROR',
-                message: process.env.NODE_ENV === 'development' ? error.message : undefined
+                error: 'Attendance already marked for this session',
+                code: 'ALREADY_MARKED'
             });
         }
-    };
+
+        // Handle validation errors
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid data provided: ' + Object.values(error.errors).map(e => e.message).join(', '),
+                code: 'VALIDATION_ERROR'
+            });
+        }
+
+        // Handle MongoDB connection errors
+        if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
+            return res.status(503).json({
+                success: false,
+                error: 'Database temporarily unavailable. Please try again in a few seconds.',
+                code: 'DATABASE_ERROR',
+                retryAfter: 5
+            });
+        }
+
+        // Default error - provide more context
+        res.status(500).json({
+            success: false,
+            error: 'Server error while marking attendance. Please try again.',
+            code: 'INTERNAL_ERROR',
+            message: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
 
 /**
  * @route   GET /api/attendance/history
@@ -1263,6 +1263,10 @@ export const getStudentSummary = async (req, res) => {
     try {
         const studentId = req.user._id;
 
+        const student = await User.findById(studentId)
+            .populate("assignedCourses", "courseCode courseName branch semester")
+            .populate("electiveCourses", "courseCode courseName branch semester");
+
         // Get all attendance records for the student
         const attendanceRecords = await Attendance.find({
             student: studentId,
@@ -1277,27 +1281,33 @@ export const getStudentSummary = async (req, res) => {
         // Group by course
         const courseMap = {};
 
+        const allCourses = [
+            ...student.assignedCourses,
+            ...student.electiveCourses
+        ];
+
+        allCourses.forEach(course => {
+            courseMap[course._id.toString()] = {
+                course: {
+                    _id: course._id,
+                    courseCode: course.courseCode,
+                    courseName: course.courseName,
+                    branch: course.branch,
+                    semester: course.semester
+                },
+                sessionsAttended: 0,
+                presentCount: 0,
+                lateCount: 0,
+                recentAttendance: []
+            };
+        });
+
         attendanceRecords.forEach(record => {
             if (!record.session?.course) return;
 
             const courseId = record.session.course._id.toString();
 
-            if (!courseMap[courseId]) {
-                courseMap[courseId] = {
-                    course: {
-                        _id: record.session.course._id,
-                        courseCode: record.session.course.courseCode,
-                        courseName: record.session.course.courseName,
-                        branch: record.session.course.branch,
-                        year: record.session.course.year,
-                        semester: record.session.course.semester
-                    },
-                    sessionsAttended: 0,
-                    presentCount: 0,
-                    lateCount: 0,
-                    recentAttendance: []
-                };
-            }
+            if (!courseMap[courseId]) return;
 
             courseMap[courseId].sessionsAttended++;
             if (record.status === 'PRESENT') {
