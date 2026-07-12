@@ -986,6 +986,13 @@ export const getCourseAttendance = async (req, res) => {
             return res.status(403).json({ success: false, error: 'Not authorized - you have not claimed this course' });
         }
 
+
+
+        const enrolledStudents = await User.find({
+            assignedCourses: courseId,
+            role: "student"
+        }).select("name email rollNo branch admissionYear");
+
         // Get all sessions for this course
         const sessions = await Session.find({ course: courseId })
             .select('sessionId startTime endTime isActive')
@@ -1004,23 +1011,24 @@ export const getCourseAttendance = async (req, res) => {
         // Create student attendance map
         const studentMap = {};
 
+        enrolledStudents.forEach(student => {
+            studentMap[student._id.toString()] = {
+                _id: student._id,
+                name: student.name,
+                rollNo: student.rollNo,
+                email: student.email,
+                branch: student.branch,
+                admissionYear: student.admissionYear,
+                sessionsAttended: 0,
+                lateCount: 0,
+                presentCount: 0,
+                attendanceDetails: []
+            };
+        });
         attendanceRecords.forEach(record => {
             const studentId = record.student?._id?.toString() || record.rollNo;
 
-            if (!studentMap[studentId]) {
-                studentMap[studentId] = {
-                    _id: record.student?._id,
-                    name: record.student?.name || record.studentName,
-                    rollNo: record.student?.rollNo || record.rollNo,
-                    email: record.student?.email,
-                    branch: record.student?.branch,
-                    admissionYear: record.student?.admissionYear,
-                    sessionsAttended: 0,
-                    lateCount: 0,
-                    presentCount: 0,
-                    attendanceDetails: []
-                };
-            }
+            if (!studentMap[studentId]) return;
 
             studentMap[studentId].sessionsAttended++;
             if (record.status === 'LATE') {
