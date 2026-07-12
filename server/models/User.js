@@ -20,11 +20,11 @@ const userSchema = new mongoose.Schema({
         trim: true
     },
     semester: {
-    type: Number,
-    min: 1,
-    max: 8,
-    default: null
-},
+        type: Number,
+        min: 1,
+        max: 8,
+        default: null
+    },
     password: {
         type: String,
         select: false
@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
     // Student Specific Fields (Derived & Immutable)
     rollNo: {
         type: String,
-        required: true,
+        required: false,
         unique: true,
         uppercase: true,
         trim: true
