@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation as useRouterLocation } from 'react-router-dom';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -14,8 +14,17 @@ import SecurityAlert, { ProxyWarning } from '../components/SecurityAlert';
 import './Attend.css';
 
 /**
- * Attendance Marking Component (v4.0 - Enhanced Security)
- * 
+ * Attendance Marking Component (v5.0 - Location captured pre-scan)
+ *
+ * Flow:
+ * - Scan.jsx now captures GPS location BEFORE the QR is scanned, and
+ *   passes it here via react-router `state` when navigating.
+ * - If that location is present, we skip our own GPS step and go
+ *   straight from "fetch session info" to "confirm".
+ * - If it's missing (e.g. this page was opened directly via a saved
+ *   link, or state was lost on refresh), we fall back to requesting
+ *   location ourselves, exactly like before.
+ *
  * Collects and sends:
  * - Session ID & Token (from QR)
  * - Nonce & Timestamp (from QR - for replay protection)
@@ -27,7 +36,11 @@ import './Attend.css';
 const Attend = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const routerLocation = useRouterLocation();
     const { user, token } = useAuth();
+
+    // Location captured on the Scan screen (if any)
+    const preScannedLocation = routerLocation.state?.location || null;
 
     // QR Data
     const sessionId = searchParams.get('session');
@@ -39,7 +52,7 @@ const Attend = () => {
     const [step, setStep] = useState('init'); // init, location, confirm, processing, success, error, blocked
     const [statusMsg, setStatusMsg] = useState('Initializing...');
     const [sessionInfo, setSessionInfo] = useState(null);
-    const [location, setLocation] = useState(null);
+    const [location, setLocation] = useState(preScannedLocation);
     const [locationStatus, setLocationStatus] = useState('');
     const [distance, setDistance] = useState(null);
 
@@ -60,7 +73,7 @@ const Attend = () => {
         setStep('init');
         setStatusMsg('Initializing...');
         setSessionInfo(null);
-        setLocation(null);
+        setLocation(preScannedLocation);
         setLocationStatus('');
         setDistance(null);
         setIsSecurityBlocked(false);
@@ -69,50 +82,50 @@ const Attend = () => {
 
         // Fetch new session info
         fetchSessionInfo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId, qrToken]);
 
 
     const fetchSessionInfo = async () => {
         try {
-            alert("fetchSessionInfo called");
-            console.log("Fetching session info...");
-
             const res = await axios.get(`${API_URL}/sessions/${sessionId}/info`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            console.log("Session info received", res.data);
-
             setSessionInfo(res.data.data);
 
-            console.log("Setting step to location");
-
-            setStep("location");
-            setStatusMsg('Getting your location...');
-
+            if (preScannedLocation) {
+                // Location was already captured on the Scan screen -
+                // process it now that we have session info, and skip
+                // straight to the confirm step.
+                processLocation(preScannedLocation, preScannedLocation.samples || [], res.data.data);
+            } else {
+                // Fallback: no location came through (e.g. direct link),
+                // fetch it here like before.
+                setStep('location');
+                setStatusMsg('Getting your location...');
+            }
 
         } catch (err) {
-            {
-                console.error(err);
+            console.error(err);
 
-                if (err.response?.status === 403) {
-                    setStep("error");
-                    setStatusMsg(
-                        err.response.data.error ||
-                        "You are not enrolled in this course."
-                    );
-                    return;
-                }
-
-                if (err.response?.status === 404) {
-                    setStep("error");
-                    setStatusMsg("Session not found.");
-                    return;
-                }
-
+            if (err.response?.status === 403) {
                 setStep("error");
-                setStatusMsg("Unable to fetch session information.");
+                setStatusMsg(
+                    err.response.data.error ||
+                    "You are not enrolled in this course."
+                );
+                return;
             }
+
+            if (err.response?.status === 404) {
+                setStep("error");
+                setStatusMsg("Session not found.");
+                return;
+            }
+
+            setStep("error");
+            setStatusMsg("Unable to fetch session information.");
         }
     };
 
@@ -132,10 +145,8 @@ const Attend = () => {
         return Math.round(R * c);
     }, []);
 
-    // V5: Request location with multi-sample collection
+    // Fallback: request location here if it wasn't captured on the Scan screen
     const requestLocation = useCallback(() => {
-        alert("requestLocation called");
-        console.log("requestLocation called");
         setLocationStatus('📡 Acquiring GPS signal...');
 
         if (!navigator.geolocation) {
@@ -144,7 +155,6 @@ const Attend = () => {
             return;
         }
 
-        // V5: Collect multiple samples for better accuracy and spoof detection
         const samples = [];
         const maxSamples = 4;
         const collectionDuration = 3500; // 3.5 seconds
@@ -155,7 +165,6 @@ const Attend = () => {
                 (position) => {
                     const { coords } = position;
 
-                    // Add sample
                     samples.push({
                         latitude: coords.latitude,
                         longitude: coords.longitude,
@@ -170,7 +179,6 @@ const Attend = () => {
                     sampleCount++;
                     setLocationStatus(`📍 Collecting GPS data... (${sampleCount}/${maxSamples})`);
 
-                    // Vibrate for haptic feedback on each sample (mobile)
                     if (navigator.vibrate) {
                         navigator.vibrate(50);
                     }
@@ -186,7 +194,6 @@ const Attend = () => {
             );
         };
 
-        // Collect samples at intervals
         collectSample();
         const interval = setInterval(() => {
             if (sampleCount < maxSamples) {
@@ -194,20 +201,17 @@ const Attend = () => {
             }
         }, collectionDuration / maxSamples);
 
-        // After collection period, process samples
         setTimeout(() => {
             clearInterval(interval);
 
-            // Use the best sample (lowest accuracy value = most accurate)
             let bestSample = samples[0];
             if (samples.length > 1) {
-                // Calculate average for centroid
                 const avgLat = samples.reduce((sum, s) => sum + s.latitude, 0) / samples.length;
                 const avgLon = samples.reduce((sum, s) => sum + s.longitude, 0) / samples.length;
                 const avgAccuracy = samples.reduce((sum, s) => sum + (s.accuracy || 0), 0) / samples.length;
 
                 bestSample = {
-                    ...samples[samples.length - 1], // Use latest timestamp
+                    ...samples[samples.length - 1],
                     latitude: avgLat,
                     longitude: avgLon,
                     accuracy: avgAccuracy
@@ -215,7 +219,6 @@ const Attend = () => {
             }
 
             if (!bestSample) {
-                // Fallback to single location request
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const { coords } = position;
@@ -247,7 +250,7 @@ const Attend = () => {
         }
     }, [step, requestLocation]);
 
-    // V5: Handle location errors with clear messages
+    // Handle location errors with clear messages
     const handleLocationError = (error) => {
         setStep('error');
         switch (error.code) {
@@ -265,45 +268,41 @@ const Attend = () => {
         }
     };
 
-    // V5: Process collected location data
-    const processLocation = (locationData, samples) => {
+    // Process collected location data.
+    // `sessionData` defaults to the sessionInfo state, but can be passed
+    // explicitly to avoid stale-closure issues when called immediately
+    // after fetchSessionInfo resolves (before the state update has landed).
+    const processLocation = (locationData, samples, sessionData = sessionInfo) => {
         setLocation(locationData);
 
-        // Store samples for sending to backend
-        if (samples.length > 0) {
+        if (samples && samples.length > 0) {
             setLocation(prev => ({ ...prev, samples }));
         }
 
-        // Calculate distance if session info available
-        if (sessionInfo?.centerLat && sessionInfo?.centerLng) {
+        if (sessionData?.centerLat && sessionData?.centerLng) {
             const dist = calculateDistance(
                 locationData.latitude,
                 locationData.longitude,
-                sessionInfo.centerLat,
-                sessionInfo.centerLng
+                sessionData.centerLat,
+                sessionData.centerLng
             );
             setDistance(dist);
 
-            // Calculate effective radius using the SAME formula as server
-            // This ensures client and server show consistent "allowed" values
             const gpsAccuracy = locationData.accuracy || 30;
-            const sessionRadius = sessionInfo.radius || 50;
+            const sessionRadius = sessionData.radius || 50;
 
-            // Match server's calculateEffectiveRadius logic:
-            const baseRadius = Math.max(sessionRadius, 50); // adaptiveGeo.baseRadius defaults to 50
-            const maxRadius = Math.max(400, sessionRadius + 100); // adaptive maxRadius cap
+            const baseRadius = Math.max(sessionRadius, 50);
+            const maxRadius = Math.max(400, sessionRadius + 100);
             const minimumBuffer = 30;
             const accuracyMultiplier = 1.0;
             const accuracyContribution = gpsAccuracy > 20 ? (gpsAccuracy - 20) * accuracyMultiplier : 0;
 
-            // Device detection for tolerance (simplified)
             const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent);
-            const deviceMultiplier = isMobile ? 1.0 : 1.2; // Desktop gets 20% more tolerance
+            const deviceMultiplier = isMobile ? 1.0 : 1.2;
 
             const adaptiveRadius = baseRadius + minimumBuffer + accuracyContribution;
             const effectiveRadius = Math.min(Math.round(adaptiveRadius * deviceMultiplier), maxRadius);
 
-            // V5: Show clearer distance feedback with effective radius
             const accuracyNote = gpsAccuracy > 50
                 ? ` (GPS accuracy: ±${Math.round(gpsAccuracy)}m - results may vary)`
                 : '';
@@ -317,7 +316,6 @@ const Attend = () => {
                 setLocationStatus(
                     `✅ Within allowed range (GPS distance: ~${dist}m)${accuracyNote}`
                 );
-                // Success vibration
                 if (navigator.vibrate) {
                     navigator.vibrate([100, 50, 100]);
                 }
@@ -329,9 +327,8 @@ const Attend = () => {
         setStep('confirm');
     };
 
-    // V5: Submit attendance with enhanced security data and location samples
+    // Submit attendance with enhanced security data and location samples
     const handleSubmit = async () => {
-        // Prevent double-tap
         if (isSubmitting) return;
 
         try {
@@ -339,20 +336,15 @@ const Attend = () => {
             setStep('processing');
             setStatusMsg('✨ Verifying and marking your attendance...');
 
-            // Generate device fingerprint
             const { fingerprint, components } = generateDeviceFingerprint();
 
-            // Build complete request payload
             const payload = {
-                // Session identification
                 sessionId,
                 token: qrToken,
 
-                // Enhanced security (nonce & timestamp for replay protection)
                 ...(qrNonce && { nonce: qrNonce }),
                 ...(qrTimestamp && { timestamp: parseInt(qrTimestamp) }),
 
-                // Full location data
                 latitude: location.latitude,
                 longitude: location.longitude,
                 accuracy: location.accuracy,
@@ -361,14 +353,11 @@ const Attend = () => {
                 heading: location.heading,
                 speed: location.speed,
 
-                // V5: Include location samples for multi-sample validation
                 ...(location.samples && { locationSamples: location.samples }),
 
-                // Device fingerprint
                 deviceFingerprint: fingerprint,
                 fingerprintComponents: components,
 
-                // Device metadata (for audit)
                 deviceType: detectDeviceType(),
                 browser: getBrowserName(),
                 os: getOSName()
@@ -381,7 +370,6 @@ const Attend = () => {
             setStep('success');
             setStatusMsg(response.data.message || '✅ Attendance marked successfully!');
 
-            // Success vibration pattern
             if (navigator.vibrate) {
                 navigator.vibrate([100, 50, 100, 50, 200]);
             }
@@ -390,7 +378,6 @@ const Attend = () => {
             const errData = error.response?.data;
             const errorCode = errData?.code || '';
 
-            // V5: Check for security-related blocks
             const securityBlockCodes = [
                 'DEVICE_OWNERSHIP_CONFLICT',
                 'DEVICE_ALREADY_USED',
@@ -400,7 +387,6 @@ const Attend = () => {
             ];
 
             if (securityBlockCodes.includes(errorCode) || error.response?.status === 409) {
-                // Security block - show full-screen warning
                 setIsSecurityBlocked(true);
                 setSecurityError({
                     code: errorCode,
@@ -409,46 +395,37 @@ const Attend = () => {
                 });
                 setStep('blocked');
 
-                // Strong error vibration
                 if (navigator.vibrate) {
                     navigator.vibrate([300, 100, 300, 100, 500]);
                 }
                 return;
             }
 
-            // Regular error
             setStep('error');
 
-            // V5: Build user-friendly error message based on error type
             let errMsg = errData?.error || 'Failed to mark attendance.';
 
-            // Handle specific error codes with clear messages
             if (errorCode === 'ALREADY_MARKED' || errMsg.toLowerCase().includes('already marked')) {
                 errMsg = '✅ Attendance already marked for this session!\n\nYou have already successfully marked your attendance.';
-                // Add debug info if available
                 if (errData?.debug) {
                     errMsg += `\n\n[Debug: ${errData.debug.source}, session: ${errData.debug.sessionId?.substring(0, 8)}...]`;
                 }
             } else if (errorCode === 'DEVICE_ALREADY_USED' || errMsg.toLowerCase().includes('device has already been used')) {
                 errMsg = '📱 This device was already used by another student in this session.\n\nEach student must use their own device.';
             } else if (errData?.distance && errData?.allowedRadius) {
-                // Add distance info if available
                 errMsg = `📍 You are ${errData.distance}m away from the classroom.\n\nAllowed range: ${errData.allowedRadius}m`;
             }
 
-            // Add hint if provided by server
             if (errData?.hint) {
                 errMsg += `\n\n💡 ${errData.hint}`;
             }
 
-            // Add retry info if rate limited
             if (errData?.retryAfter) {
                 errMsg += `\n\n⏱️ Please wait ${errData.retryAfter} seconds before trying again.`;
             }
 
             setStatusMsg(errMsg);
 
-            // Error vibration
             if (navigator.vibrate) {
                 navigator.vibrate([200, 100, 200]);
             }
@@ -461,8 +438,6 @@ const Attend = () => {
     const renderSessionInfo = () => {
         if (!sessionInfo) return null;
 
-        // Calculate approximate effective radius (same logic as server)
-        // Session radius + 30m minimum indoor buffer + GPS accuracy contribution
         const gpsAccuracy = location?.accuracy || 30;
         const effectiveRadius = sessionInfo.radius + 30 + (gpsAccuracy > 20 ? (gpsAccuracy - 20) : 0);
 
@@ -491,11 +466,9 @@ const Attend = () => {
     const renderLocationInfo = () => {
         if (!location) return null;
 
-        // Calculate approximate effective radius for display (matching server logic)
         const gpsAccuracy = location.accuracy || 30;
         const sessionRadius = sessionInfo?.radius || 50;
 
-        // Match server's calculateEffectiveRadius logic:
         const baseRadius = Math.max(sessionRadius, 50);
         const maxRadius = Math.max(400, sessionRadius + 100);
         const minimumBuffer = 30;
@@ -511,7 +484,6 @@ const Attend = () => {
 
         return (
             <div className="location-info">
-                {/* GPS Accuracy Indicator */}
                 <div className="accuracy-indicator" style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -530,7 +502,6 @@ const Attend = () => {
                     </span>
                 </div>
 
-                {/* Distance Status */}
                 {distance !== null && (
                     <div className={`distance-status ${isWithinRange ? 'success' : 'warning'}`} style={{
                         padding: '12px',
@@ -550,7 +521,6 @@ const Attend = () => {
                     </div>
                 )}
 
-                {/* GPS Limitation Note */}
                 <div style={{
                     marginTop: '10px',
                     padding: '8px 10px',
@@ -578,18 +548,12 @@ const Attend = () => {
                 {renderSessionInfo()}
 
                 <div className="status-box">
-                    {/* Location Request Step */}
+                    {/* Location Request Step (fallback path only) */}
                     {step === 'location' && (
                         <div className="loading-state">
                             <div className="spinner"></div>
                             <p>{locationStatus || "Getting your location..."}</p>
                         </div>
-                        // <div className="location-step">
-                        //     <p>Share your location to verify you're in the classroom</p>
-                        //     <button className="btn btn-primary" onClick={requestLocation}>
-                        //         📍 Share My Location
-                        //     </button>
-                        // </div>
                     )}
 
                     {/* Confirm Step */}
@@ -675,7 +639,7 @@ const Attend = () => {
                 </div>
             </div>
 
-            {/* V5: Security Block Overlay */}
+            {/* Security Block Overlay */}
             {isSecurityBlocked && (
                 <ProxyWarning
                     isBlocked={securityError?.isBlocked}
@@ -688,4 +652,3 @@ const Attend = () => {
 };
 
 export default Attend;
-
