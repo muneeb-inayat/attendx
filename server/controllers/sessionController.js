@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { Session, Course, Attendance, AuditLog } from '../models/index.js';
+import { Session, Course, Attendance, User, AuditLog } from '../models/index.js';
 import { redisService } from '../config/redis.js';
 import config from '../config/index.js';
 
@@ -399,7 +399,7 @@ export const stopSession = async (req, res) => {
 export const getStudentSessionInfo = async (req, res) => {
     try {
         const session = await Session.findById(req.params.id)
-            .populate('course', 'courseName courseCode branch year semester');
+            .populate('course', 'courseName courseCode branch semester batch');
 
         if (!session) {
             return res.status(404).json({
@@ -409,42 +409,30 @@ export const getStudentSessionInfo = async (req, res) => {
         }
 
         // Check if student is eligible for this course
-        const student = req.user;
-        if (student.role === 'student') {
-            const studentBranchCode = (student.branchCode || '').toLowerCase();
-            const courseBranchCode = (session.course.branch || '').toLowerCase();
+        if (req.user.role === "student") {
 
-            const branchMatch = studentBranchCode === courseBranchCode;
-            const yearMatch = session.course.year === student.academicState?.year;
+            const student = await User.findById(req.user._id)
+                .select("assignedCourses electiveCourses");
 
-            // Check batch eligibility:
-            // - If course has no batch or batch is 'all', everyone is eligible
-            // - Otherwise, batch must match
-            const courseBatch = session.course.batch || 'all';
-            const batchMatch = courseBatch === 'all' || courseBatch === student.batch;
+            if (!student) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Student not found"
+                });
+            }
 
-            // Check if course is in student's approved electives
-            const isElective = student.electiveCourses?.some(
-                ec => ec.toString() === session.course._id.toString()
+            const isAssigned = (student.assignedCourses || []).some(
+                id => id.toString() === session.course._id.toString()
             );
 
-            if (!((branchMatch && yearMatch && batchMatch) || isElective)) {
-                const batchInfo = courseBatch !== 'all' ? ` Batch ${courseBatch}` : '';
+            const isElective = (student.electiveCourses || []).some(
+                id => id.toString() === session.course._id.toString()
+            );
+
+            if (!isAssigned && !isElective) {
                 return res.status(403).json({
                     success: false,
-                    error: 'You are not eligible for this course',
-                    details: {
-                        required: {
-                            branch: session.course.branch?.toUpperCase(),
-                            year: session.course.year,
-                            batch: session.course.batch
-                        },
-                        your: {
-                            branch: studentBranchCode.toUpperCase(),
-                            year: student.academicState?.year,
-                            batch: student.batch
-                        }
-                    }
+                    error: "You are not enrolled in this course."
                 });
             }
         }
@@ -457,7 +445,7 @@ export const getStudentSessionInfo = async (req, res) => {
                 courseName: session.course.courseName,
                 courseCode: session.course.courseCode,
                 branch: session.course.branch,
-                year: session.course.year,
+                semester: session.course.semester,
                 startTime: session.startTime,
                 endTime: session.endTime,
                 isActive: session.isActive,

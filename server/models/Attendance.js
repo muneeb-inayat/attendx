@@ -97,22 +97,35 @@ const attendanceSchema = new mongoose.Schema({
     securityFlags: [{
         type: String,
         enum: [
-            'PERFECT_ACCURACY',
-            'LOCATION_JUMP',
-            'DEVICE_SWITCHING',
-            'RAPID_ATTEMPTS',
-            'SHARED_DEVICE',
-            'SUSPICIOUS_LOCATION',
-            'LOW_PRECISION_COORDINATES',
-            'ZERO_ALTITUDE',
-            'MISSING_ACCURACY',
-            'NEAR_EDGE',
-            // V5 additions - used in controller
-            'TOKEN_REPLAY_ATTEMPT',
-            'MULTI_STUDENT_DEVICE',
-            'TOO_MANY_DEVICES',
-            'EXTENDED_ALLOWANCE'
-        ]
+            // Existing
+            "PERFECT_ACCURACY",
+            "LOCATION_JUMP",
+            "DEVICE_SWITCHING",
+            "RAPID_ATTEMPTS",
+            "SHARED_DEVICE",
+            "SUSPICIOUS_LOCATION",
+            "LOW_PRECISION_COORDINATES",
+            "ZERO_ALTITUDE",
+            "MISSING_ACCURACY",
+            "NEAR_EDGE",
+
+            // Geolocation validation
+            "POOR_ACCURACY",
+            "SUSPICIOUS_PRECISION",
+            "TELEPORTATION",
+            "RAPID_MOVEMENT",
+            "SPEED_MISMATCH",
+            "OUT_OF_RANGE",
+            "HIGH_VARIANCE",
+            "TELEPORTATION_DETECTED",
+            "ACCURACY_TOO_LOW",
+            "EXTENDED_ALLOWANCE",
+
+            // Security
+            "TOKEN_REPLAY_ATTEMPT",
+            "MULTI_STUDENT_DEVICE",
+            "TOO_MANY_DEVICES"
+        ]   
     }],
     suspicionScore: {
         type: Number,

@@ -71,13 +71,6 @@ const Attend = () => {
         fetchSessionInfo();
     }, [sessionId, qrToken]);
 
-    useEffect(() => {
-        if (step === "location") {
-            requestLocation();
-        }
-    }, [step, requestLocation]);
-
-
 
     const fetchSessionInfo = async () => {
         try {
@@ -99,7 +92,27 @@ const Attend = () => {
 
 
         } catch (err) {
-            console.log("Session info failed", err.response?.data);
+            {
+                console.error(err);
+
+                if (err.response?.status === 403) {
+                    setStep("error");
+                    setStatusMsg(
+                        err.response.data.error ||
+                        "You are not enrolled in this course."
+                    );
+                    return;
+                }
+
+                if (err.response?.status === 404) {
+                    setStep("error");
+                    setStatusMsg("Session not found.");
+                    return;
+                }
+
+                setStep("error");
+                setStatusMsg("Unable to fetch session information.");
+            }
         }
     };
 
@@ -226,6 +239,13 @@ const Attend = () => {
             }
         }, collectionDuration + 500);
     }, [sessionInfo, calculateDistance]);
+
+
+    useEffect(() => {
+        if (step === "location") {
+            requestLocation();
+        }
+    }, [step, requestLocation]);
 
     // V5: Handle location errors with clear messages
     const handleLocationError = (error) => {
