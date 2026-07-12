@@ -10,11 +10,7 @@
 
 **🔐 7-Layer Security** • **📍 Adaptive GPS** • **📱 Device Binding** • **🔄 Rotating QR** • **📊 Real-time Analytics**
 
----
 
-### 🌐 **[Live Demo](https://checkatte.vercel.app/)** | 🎬 **[Watch Demo Video](https://youtu.be/xYmjg0JIayQ)**
-
----
 
 </div>
 
@@ -28,11 +24,8 @@
 
 ### 🔑 STEP 1: Login as Admin (Pre-configured)
 
-| 🌐 URL                                                     | 📧 Email             | 🔒 Password |
-| --------------------------------------------------------- | ------------------- | ---------- |
-| **[checkatte.vercel.app](https://checkatte.vercel.app/)** | `admin@AttendX.com` | `        ` |
 
-1. Open the link above
+1. Open the web app
 2. Click **"Admin Login"** button
 3. Enter credentials from the table
 4. ✅ You're now in the Admin Dashboard!
@@ -47,7 +40,7 @@
 
 ### 🔑 STEP 2: Create a Professor Account
 
-1. Go back to **[checkatte.vercel.app](https://checkatte.vercel.app/)**
+1. Go back to the webapp
 2. Click **"Professor Login"** → **"Login with Google"**
 3. Login with **any Google account** (e.g., `yourname@gmail.com`)
 4. **Important**: Go back to Admin Dashboard → Approvals → Approve the professor
@@ -133,7 +126,7 @@
 
 #### Step 1️⃣: Admin Setup (Required First)
 
-1. Go to **https://checkatte.vercel.app/**
+1. Go to webapp.
 2. Click **"Admin Login"**.
 3. Login using your administrator credentials.
 4. **Import Courses**:
