@@ -1,4 +1,4 @@
-# 🎓 QR Attendance System v5.0
+# 🎓 AttendX-QR Attendance System v1.0
 
 <div align="center">
 
@@ -105,10 +105,10 @@
 
 ### 🔑 Login Methods
 
-| Role          | Login Method                  | Notes                                                                 |
-| ------------- | ----------------------------- | --------------------------------------------------------------------- |
-| **Admin**     | Email/Password                | Uses administrator credentials configured during system setup.         |
-| **Professor** | Google OAuth                  | Sign in using a Google account. Requires admin approval before access. |
+| Role          | Login Method                  | Notes                                                                                                                  |
+| ------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Admin**     | Email/Password                | Uses administrator credentials configured during system setup.                                                         |
+| **Professor** | Google OAuth                  | Sign in using a Google account. Requires admin approval before access.                                                 |
 | **Student**   | Email or Roll Number/Password | Accounts are created by the admin via CSV import. Default password: `RollNumber@123` (must be changed on first login). |
 
 ### � Important: Use Mobile Phone for Session Creation
