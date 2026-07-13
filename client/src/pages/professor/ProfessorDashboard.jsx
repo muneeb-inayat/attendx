@@ -7,19 +7,12 @@ import ThemeToggle from '../../components/ThemeToggle';
 import API_URL from '../../config/api';
 import './ProfessorDashboard.css';
 
-const BRANCH_OPTIONS = [
-    { code: 'uch', name: 'Chemical' },
-    { code: 'ucp', name: 'Computer Science' },
-    { code: 'uce', name: 'Civil' },
-    { code: 'uec', name: 'Electronics' },
-    { code: 'uee', name: 'Electrical' },
-    { code: 'ume', name: 'Mechanical' },
-    { code: 'umt', name: 'Metallurgical' }
-];
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const ProfessorDashboard = () => {
+    const [branches, setBranches] = useState([]);
+
     const [overrideSession, setOverrideSession] = useState(null);
     const [overrideStudents, setOverrideStudents] = useState([]);
     const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -97,6 +90,20 @@ const ProfessorDashboard = () => {
         getLocation();
     }, []);
 
+
+    const fetchBranches = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/courses/branches`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBranches(res.data.data || []);
+        } catch {
+            toast.error('Failed to load branches');
+        }
+    };
+    useEffect(() => {
+        fetchBranches();
+    }, []);
     // Refresh data when coming back from stopped session
     useEffect(() => {
         if (navState.state?.refresh) {
@@ -565,7 +572,7 @@ const ProfessorDashboard = () => {
                                         className="filter-select"
                                     >
                                         <option value="">All Branches</option>
-                                        {BRANCH_OPTIONS.map(b => (
+                                        {branches.map(b => (
                                             <option key={b.code} value={b.code}>{b.name}</option>
                                         ))}
                                     </select>

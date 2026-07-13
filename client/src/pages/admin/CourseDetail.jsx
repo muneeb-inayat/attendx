@@ -39,17 +39,18 @@ const CourseDetail = () => {
 
     const fetchCourse = async () => {
         try {
-            const res = await axios.get(`${API_URL}/courses/${id}`, {
+            const res = await axios.get(`${API_URL}/admin/courses/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCourse(res.data.data);
             setSessions(res.data.data.sessions || []);
 
-            const enrollRes = await axios.get(`${API_URL}/courses/${id}/enrollments`, {
+            const enrollRes = await axios.get(`${API_URL}/admin/courses/${id}/enrollments`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setEnrollments(enrollRes.data.data || []);
-        } catch (err) {
+        }
+        catch (err) {
             if (err.response?.status === 401) {
                 logout();
                 navigate('/login');

@@ -8,7 +8,8 @@ import {
     getMyClaimRequests,
     updateCourse,
     getStudentCourses,
-    
+    getAvailableBranches,
+
 } from '../controllers/courseController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -24,6 +25,11 @@ router.get('/my-courses', authorize('student'), getStudentCourses);
 // ============================================
 // PROFESSOR ROUTES
 // ============================================
+router.get(
+    '/branches',
+    authorize('professor', 'admin'),
+    getAvailableBranches
+);
 // Get claimed courses and claimable courses
 router.get('/', authorize('professor', 'admin'), getCourses);
 router.get('/claimable', authorize('professor'), getClaimableCourses);

@@ -73,6 +73,35 @@ export const getClaimableCourses = async (req, res) => {
     }
 };
 
+
+/**
+ * @route   GET /api/courses/branches
+ * @desc    Get available branches
+ * @access  Private (Professor/Admin)
+ */
+export const getAvailableBranches = async (req, res) => {
+    try {
+        const branches = await Course.distinct('branch');
+
+        res.json({
+            success: true,
+            data: branches
+                .filter(Boolean)
+                .sort()
+                .map(branch => ({
+                    code: branch,
+                    name: branch.toUpperCase()
+                }))
+        });
+    } catch (error) {
+        console.error('Get Branches Error:', error);
+
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get branches'
+        });
+    }
+};
 /**
  * @route   GET /api/courses/:id
  * @desc    Get course details (only if professor has claimed it)
@@ -361,85 +390,10 @@ export const getStudentCourses = async (req, res) => {
 };
 
 
-/**
- * @route   POST /api/courses/:id/request-elective
- * @desc    Request enrollment in an elective course
- * @access  Private (Student)
- */
-// export const requestElective = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const { reason } = req.body;
-
-//         if (!reason) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: 'Please provide a reason for requesting this elective'
-//             });
-//         }
-
-//         const course = await Course.findById(id);
-//         if (!course) {
-//             return res.status(404).json({ success: false, error: 'Course not found' });
-//         }
-
-//         // Check if already enrolled (auto or elective)
-//         const user = req.user;
-//         const academicState = calculateAcademicState(user.admissionYear);
-
-//         // Check if it's already an auto-enrolled course
-//         if (course.branch === user.branchCode?.toLowerCase() && course.year === academicState.year) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: 'You are already auto-enrolled in this course'
-//             });
-//         }
-
-//         // Check if already in electives
-//         const userDoc = await User.findById(user._id);
-//         if (userDoc.electiveCourses?.includes(id)) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: 'You are already enrolled in this elective'
-//             });
-//         }
-
-//         // Check for existing pending request
-//         const { default: ElectiveRequest } = await import('../models/ElectiveRequest.js');
-//         const existingRequest = await ElectiveRequest.findOne({
-//             student: user._id,
-//             course: id,
-//             status: 'pending'
-//         });
-
-//         if (existingRequest) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: 'You already have a pending request for this course'
-//             });
-//         }
-
-//         // Create request
-//         const electiveRequest = await ElectiveRequest.create({
-//             student: user._id,
-//             course: id,
-//             reason
-//         });
-
-//         res.status(201).json({
-//             success: true,
-//             message: 'Elective request submitted. Waiting for admin approval.',
-//             data: electiveRequest
-//         });
-//     } catch (error) {
-//         console.error('Request Elective Error:', error);
-//         res.status(500).json({ success: false, error: 'Failed to submit request' });
-//     }
-// };
-
 export default {
     getCourses,
     getClaimableCourses,
+    getAvailableBranches,
     getCourse,
     claimCourse,
     unclaimCourse,

@@ -482,6 +482,30 @@ export const getAllCourses = async (req, res) => {
 };
 
 /**
+ * @route GET /api/admin/courses/branches
+ * @desc List branch codes currently available in non-archived courses
+ * @access Private (Admin)
+ */
+export const getAvailableBranches = async (req, res) => {
+    try {
+        const branchCodes = await Course.distinct('branch', {
+            isArchived: false,
+            branch: { $type: 'string', $ne: '' }
+        });
+
+        const data = branchCodes
+            .map(code => code.trim().toLowerCase())
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b))
+            .map(code => ({ code, name: code.toUpperCase() }));
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Get Available Branches Error:', error);
+        res.status(500).json({ success: false, error: 'Server Error' });
+    }
+};
+/**
  * @route   PUT /api/admin/courses/:id
  * @desc    Update a course (Admin only)
  * @access  Private (Admin)
@@ -489,22 +513,32 @@ export const getAllCourses = async (req, res) => {
 export const updateCourse = async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
 
         const course = await Course.findById(id);
+
         if (!course) {
-            return res.status(404).json({ success: false, error: 'Course not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Course not found'
+            });
         }
 
-        // Fields that can be updated
         const allowedUpdates = [
-            'courseName', 'description', 'schedule',
-            'defaultLocation', 'defaultDuration', 'lateThreshold'
+            'branch',
+            'courseName',
+            'description',
+            'credits',
+            'semester',
+            'batch',
+            'schedules',
+            'defaultLocation',
+            'defaultDuration',
+            'lateThreshold'
         ];
 
         allowedUpdates.forEach(field => {
-            if (updates[field] !== undefined) {
-                course[field] = updates[field];
+            if (req.body[field] !== undefined) {
+                course[field] = req.body[field];
             }
         });
 
@@ -515,9 +549,41 @@ export const updateCourse = async (req, res) => {
             message: 'Course updated successfully',
             data: course
         });
+
     } catch (error) {
         console.error('Update Course Error:', error);
-        res.status(500).json({ success: false, error: 'Server Error' });
+
+        res.status(500).json({
+            success: false,
+            error: 'Server Error'
+        });
+    }
+};
+
+export const getCourseById = async (req, res) => {
+    try {
+        const course = await Course.findById(req.params.id)
+            .populate('claimedBy', 'name email')
+            .populate('createdBy', 'name email');
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                error: 'Course not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: course
+        });
+    } catch (error) {
+        console.error('Get Course By Id Error:', error);
+
+        res.status(500).json({
+            success: false,
+            error: 'Server Error'
+        });
     }
 };
 
@@ -1100,6 +1166,7 @@ export default {
     // Course management
     createCourse,
     getAllCourses,
+    getAvailableBranches,
     updateCourse,
     deleteCourse,
 

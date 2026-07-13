@@ -9,9 +9,11 @@ import {
     createCourse,
     bulkImportCourses,
     getAllCourses,
+    getAvailableBranches,
     updateCourse,
     deleteCourse,
-  
+    getCourseById,
+
     // Claim requests
     getClaimRequests,
     processClaimRequest,
@@ -35,6 +37,8 @@ import { protect, authorize } from '../middleware/auth.js';
 import { uploadStudents } from '../middleware/upload.js'
 
 const router = express.Router();
+
+router.get('/courses/branches', getAvailableBranches);
 
 // All routes require authentication and admin role
 router.use(protect);
@@ -77,6 +81,7 @@ router.post(
     bulkImportCourses
 );
 router.get('/courses', getAllCourses);
+router.get('/courses/:id', getCourseById);
 router.put('/courses/:id', updateCourse);
 router.delete('/courses/:id', deleteCourse);
 
