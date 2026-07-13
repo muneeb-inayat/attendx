@@ -73,6 +73,12 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    deviceSecurity: {
+        changeAttempts: { type: Number, default: 0 },
+        blocked: { type: Boolean, default: false },
+        blockedAt: Date,
+        blockedReason: String
+    },
 
     // Approved elective courses (courses outside student's branch/year)
     electiveCourses: [{

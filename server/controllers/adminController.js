@@ -1,4 +1,4 @@
-import { User, Course, Session, Attendance, AuditLog,ClaimRequest, ElectiveRequest } from '../models/index.js';
+import { User, Course, Session, Attendance, AuditLog, ClaimRequest, ElectiveRequest, DeviceRegistry } from '../models/index.js';
 import fs from "fs";
 import csv from "csv-parser";
 
@@ -1016,6 +1016,82 @@ export const deleteUser = async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to delete user' });
     }
 };
+export const getPendingDeviceChanges = async (req, res) => {
+    const requests = await DeviceRegistry.find({ status: 'pending' })
+        .populate('student', 'name email rollNo deviceSecurity')
+        .sort({ requestedAt: 1 });
+    res.json({ success: true, data: requests });
+};
+
+export const approveDeviceChange = async (req, res) => {
+    const request = await DeviceRegistry.findOne({
+        _id: req.params.requestId,
+        status: 'pending'
+    });
+    if (!request) {
+        return res.status(404).json({ success: false, error: 'Pending device request not found' });
+    }
+
+    // A student can have only one active device.
+    await DeviceRegistry.updateMany(
+        { student: request.student, status: 'active' },
+        { $set: { status: 'revoked', reviewedBy: req.user._id, reviewedAt: new Date(), reviewNote: 'Replaced by approved device' } }
+    );
+    await DeviceRegistry.updateMany(
+        {
+            student: request.student,
+            status: 'pending',
+            _id: { $ne: request._id }
+        },
+        {
+            $set: {
+                status: 'rejected',
+                reviewedBy: req.user._id,
+                reviewedAt: new Date(),
+                reviewNote: 'Another device-change request was approved'
+            }
+        }
+    );
+
+    request.status = 'active';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.reviewNote = req.body.note?.trim() || 'Approved by administrator';
+    request.usageCount += 1;
+    request.lastUsed = new Date();
+    await request.save();
+
+    // Approval resets the change counter and removes the block.
+    await User.findByIdAndUpdate(request.student, {
+        $set: {
+            'deviceSecurity.changeAttempts': 0,
+            'deviceSecurity.blocked': false,
+            'deviceSecurity.blockedAt': null,
+            'deviceSecurity.blockedReason': null
+        }
+    });
+
+    res.json({ success: true, message: 'New device approved' });
+};
+
+export const rejectDeviceChange = async (req, res) => {
+    const request = await DeviceRegistry.findOneAndUpdate(
+        { _id: req.params.requestId, status: 'pending' },
+        {
+            $set: {
+                status: 'rejected',
+                reviewedBy: req.user._id,
+                reviewedAt: new Date(),
+                reviewNote: req.body.reason?.trim() || 'Rejected by administrator'
+            }
+        },
+        { new: true }
+    );
+    if (!request) {
+        return res.status(404).json({ success: false, error: 'Pending device request not found' });
+    }
+    res.json({ success: true, message: 'Device change rejected' });
+};
 
 export default {
     // Professor management
@@ -1040,6 +1116,9 @@ export default {
     getSystemAnalytics,
     bulkApproveStudents,
     // User management
-    deleteUser
+    deleteUser,
+    getPendingDeviceChanges,
+    approveDeviceChange,
+    rejectDeviceChange
 };
 

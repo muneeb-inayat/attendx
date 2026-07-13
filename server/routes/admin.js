@@ -25,7 +25,10 @@ import {
     getSystemAnalytics,
     bulkApproveStudents,
     // User management
-    deleteUser
+    deleteUser,
+    getPendingDeviceChanges,
+    approveDeviceChange,
+    rejectDeviceChange
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -47,6 +50,9 @@ router.get('/analytics', getSystemAnalytics);
 // ============================================
 router.get('/students', getAllStudents);
 router.get('/professors', getAllProfessors);
+router.get('/device-changes', getPendingDeviceChanges);
+router.post('/device-changes/:requestId/approve', approveDeviceChange);
+router.post('/device-changes/:requestId/reject', rejectDeviceChange);
 
 // ============================================
 // USER MANAGEMENT (DELETE)

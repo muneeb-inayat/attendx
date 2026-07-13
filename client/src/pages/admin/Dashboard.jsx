@@ -11,6 +11,7 @@ const AdminDashboard = () => {
     const { user, token, logout } = useAuth();
     const navigate = useNavigate();
 
+    const [deviceChanges, setDeviceChanges] = useState([]);
     const [analytics, setAnalytics] = useState(null);
     const [pendingProfessors, setPendingProfessors] = useState([]);
     const [claimRequests, setClaimRequests] = useState([]);
@@ -32,18 +33,22 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         const headers = { Authorization: `Bearer ${token}` };
         try {
-            const [analyticsRes, professorsRes, claimsRes, electivesRes, usersRes] = await Promise.all([
-                axios.get(`${API_URL}/admin/analytics`, { headers }).catch(() => ({ data: { data: null } })),
-                axios.get(`${API_URL}/admin/pending-professors`, { headers }).catch(() => ({ data: { data: [] } })),
-                axios.get(`${API_URL}/admin/claim-requests`, { headers }).catch(() => ({ data: { data: [] } })),
-                axios.get(`${API_URL}/admin/elective-requests`, { headers }).catch(() => ({ data: { data: [] } })),
-                axios.get(`${API_URL}/admin/pending-users`, { headers }).catch(() => ({ data: { data: [] } }))
-            ]);
+            const [analyticsRes, professorsRes, claimsRes, electivesRes, usersRes, deviceChangesRes] = await Promise.all(
+                [
+                    axios.get(`${API_URL}/admin/analytics`, { headers }).catch(() => ({ data: { data: null } })),
+                    axios.get(`${API_URL}/admin/pending-professors`, { headers }).catch(() => ({ data: { data: [] } })),
+                    axios.get(`${API_URL}/admin/claim-requests`, { headers }).catch(() => ({ data: { data: [] } })),
+                    axios.get(`${API_URL}/admin/elective-requests`, { headers }).catch(() => ({ data: { data: [] } })),
+                    axios.get(`${API_URL}/admin/pending-users`, { headers }).catch(() => ({ data: { data: [] } })),
+                    axios.get(`${API_URL}/admin/device-changes`, { headers }).catch(() => ({ data: { data: [] } }))
+                ]
+            );
             setAnalytics(analyticsRes.data.data);
             setPendingProfessors(professorsRes.data.data || []);
             setClaimRequests(claimsRes.data.data?.filter(r => r.status === 'pending') || []);
             setElectiveRequests(electivesRes.data.data?.filter(r => r.status === 'pending') || []);
             setPendingUsers(usersRes.data.data || []);
+            setDeviceChanges(deviceChangesRes.data.data || []);
         } catch (error) {
             console.error('Fetch error:', error);
             toast.error('Failed to load dashboard data');
@@ -175,6 +180,26 @@ const AdminDashboard = () => {
         setProcessingId(null);
     };
 
+    const handleDeviceChange = async (requestId, action) => {
+        const actionLabel = action === 'approve' ? 'approve' : 'reject';
+        if (!confirm(`${actionLabel === 'approve' ? 'Approve' : 'Reject'} this device change?`)) return;
+
+        setProcessingId(requestId);
+        try {
+            const res = await axios.post(
+                `${API_URL}/admin/device-changes/${requestId}/${action}`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success(res.data.message || `Device change ${actionLabel}d`);
+            await fetchData();
+        } catch (error) {
+            toast.error(error.response?.data?.error || `Could not ${actionLabel} device change`);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     // Flush Redis Cache (for fixing stale attendance marks)
     const handleFlushRedis = async () => {
         if (!confirm('⚠️ Clear ALL attendance cache in Redis?\n\nThis will NOT delete actual attendance records from database.\nUse this to fix "already marked" errors on new sessions.')) {
@@ -207,8 +232,11 @@ const AdminDashboard = () => {
     };
 
     // Calculate pending totals
-    const totalPending = pendingProfessors.length + claimRequests.length + electiveRequests.length + pendingUsers.length;
-
+    const totalPending = pendingProfessors.length
+        + claimRequests.length
+        + electiveRequests.length
+        + pendingUsers.length
+        + deviceChanges.length;
     // Skeleton components
     const SkeletonCard = () => (
         <div className="skeleton-card">
@@ -499,6 +527,13 @@ const AdminDashboard = () => {
                                             <span className="count">{pendingUsers.length}</span>
                                         )}
                                     </button>
+                                    <button
+                                        className={`approval-tab ${approvalTab === 'devices' ? 'active' : ''}`}
+                                        onClick={() => setApprovalTab('devices')}
+                                    >
+                                        📱 Devices
+                                        {deviceChanges.length > 0 && <span className="count">{deviceChanges.length}</span>}
+                                    </button>
                                 </div>
 
                                 {/* Pending Professors */}
@@ -624,36 +659,91 @@ const AdminDashboard = () => {
                                 )}
 
                                 {/* Pending Users */}
-                                {approvalTab === 'users' && (
+                                {approvalTab === 'users' &&
+                                    (
+                                        <div className="approval-list">
+                                            {pendingUsers.length === 0 ? (
+                                                <div className="empty-state">
+                                                    <span className="empty-icon">✅</span>
+                                                    <p>No pending user approvals</p>
+                                                </div>
+                                            ) : (
+                                                pendingUsers.map(user => (
+                                                    <div key={user._id} className="approval-card">
+                                                        <div className="approval-avatar">
+                                                            {user.name?.charAt(0) || '?'}
+                                                        </div>
+                                                        <div className="approval-info">
+                                                            <h4>{user.name}</h4>
+                                                            <p>{user.email}</p>
+                                                            <span className="approval-role">{user.role}</span>
+                                                        </div>
+                                                        <div className="approval-actions">
+                                                            <button
+                                                                className="btn-approve"
+                                                                onClick={() => handlePendingUser(user._id, 'approve', { role: user.role, branch: user.branch, year: user.year })}
+                                                                disabled={processingId === user._id}
+                                                            >
+                                                                {processingId === user._id ? '...' : '✓ Approve'}
+                                                            </button>
+                                                            <button
+                                                                className="btn-reject"
+                                                                onClick={() => handlePendingUser(user._id, 'reject')}
+                                                                disabled={processingId === user._id}
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                    )}
+                                {approvalTab === 'devices' && (
                                     <div className="approval-list">
-                                        {pendingUsers.length === 0 ? (
+                                        {deviceChanges.length === 0 ? (
                                             <div className="empty-state">
                                                 <span className="empty-icon">✅</span>
-                                                <p>No pending user approvals</p>
+                                                <p>No pending device changes</p>
                                             </div>
                                         ) : (
-                                            pendingUsers.map(user => (
-                                                <div key={user._id} className="approval-card">
-                                                    <div className="approval-avatar">
-                                                        {user.name?.charAt(0) || '?'}
-                                                    </div>
+                                            deviceChanges.map(request => (
+                                                <div key={request._id} className="approval-card">
+                                                    <div className="approval-icon elective">📱</div>
                                                     <div className="approval-info">
-                                                        <h4>{user.name}</h4>
-                                                        <p>{user.email}</p>
-                                                        <span className="approval-role">{user.role}</span>
+                                                        <h4>{request.student?.name || 'Student'}</h4>
+                                                        <p>
+                                                            {request.student?.rollNo || 'No roll number'}
+                                                            {request.student?.email ? ` · ${request.student.email}` : ''}
+                                                        </p>
+                                                        <p>
+                                                            {request.deviceType || 'Unknown device'}
+                                                            {request.browser ? ` · ${request.browser}` : ''}
+                                                            {request.os ? ` · ${request.os}` : ''}
+                                                        </p>
+                                                        {request.requestedAt && (
+                                                            <span className="approval-date">
+                                                                Requested {new Date(request.requestedAt).toLocaleString('en-IN')}
+                                                            </span>
+                                                        )}
+                                                        {request.student?.deviceSecurity?.blocked && (
+                                                            <span className="approval-message">Student is currently blocked for repeated device changes.</span>
+                                                        )}
                                                     </div>
                                                     <div className="approval-actions">
                                                         <button
                                                             className="btn-approve"
-                                                            onClick={() => handlePendingUser(user._id, 'approve', { role: user.role, branch: user.branch, year: user.year })}
-                                                            disabled={processingId === user._id}
+                                                            onClick={() => handleDeviceChange(request._id, 'approve')}
+                                                            disabled={processingId === request._id}
                                                         >
-                                                            {processingId === user._id ? '...' : '✓ Approve'}
+                                                            {processingId === request._id ? '...' : '✓ Approve'}
                                                         </button>
                                                         <button
                                                             className="btn-reject"
-                                                            onClick={() => handlePendingUser(user._id, 'reject')}
-                                                            disabled={processingId === user._id}
+                                                            onClick={() => handleDeviceChange(request._id, 'reject')}
+                                                            disabled={processingId === request._id}
+                                                            title="Reject device change"
                                                         >
                                                             ✕
                                                         </button>

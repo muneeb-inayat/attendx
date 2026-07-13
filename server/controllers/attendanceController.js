@@ -426,7 +426,20 @@ export const markAttendance = async (req, res) => {
         }
 
         // Register/validate device for student
-        const deviceResult = await DeviceRegistry.registerDevice(student._id, {
+        const fullStudent = await User.findById(student._id).select('assignedCourses electiveCourses deviceSecurity');
+        if (!fullStudent) {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+
+        if (fullStudent.deviceSecurity?.blocked) {
+            return res.status(403).json({
+                success: false,
+                error: 'Device changes are blocked. Please contact an administrator.',
+                code: 'DEVICE_CHANGES_BLOCKED'
+            });
+        }
+
+        const deviceResult = await DeviceRegistry.checkOrRequestDevice(student._id, {
             deviceHash,
             fingerprintComponents: req.body.fingerprintComponents || {},
             deviceType,
@@ -436,26 +449,52 @@ export const markAttendance = async (req, res) => {
             location: { latitude, longitude }
         });
 
-        if (!deviceResult.success) {
-            securityFlags.push('TOO_MANY_DEVICES');
-            suspicionScore += 20;
+        if (!deviceResult.allowed) {
+            let nowBlocked = false;
+
+            if (deviceResult.isNewRequest) {
+                const updatedStudent = await User.findByIdAndUpdate(
+                    student._id,
+                    { $inc: { 'deviceSecurity.changeAttempts': 1 } },
+                    { new: true }
+                ).select('deviceSecurity');
+
+                // Three distinct unapproved device changes block all further attendance attempts.
+                if (updatedStudent.deviceSecurity.changeAttempts >= 3) {
+                    nowBlocked = true;
+                    await User.findByIdAndUpdate(student._id, {
+                        $set: {
+                            'deviceSecurity.blocked': true,
+                            'deviceSecurity.blockedAt': new Date(),
+                            'deviceSecurity.blockedReason': 'Too many unapproved device changes'
+                        }
+                    });
+                }
+            }
+
             await logAudit('ATTENDANCE_FAILED', {
                 userId: student._id,
                 userEmail: student.email,
                 sessionId: session._id,
+                courseId: course._id,
                 deviceHash,
-                failureReason: deviceResult.message,
-                failureCode: 'TOO_MANY_DEVICES',
+                failureReason: nowBlocked
+                    ? 'Too many unapproved device changes'
+                    : 'New device awaiting administrator approval',
+                failureCode: nowBlocked ? 'DEVICE_CHANGES_BLOCKED' : 'DEVICE_CHANGE_PENDING',
                 ipAddress
             });
-            // Don't fail - just flag it
+
+            return res.status(403).json({
+                success: false,
+                error: nowBlocked
+                    ? 'Too many device changes. Attendance is blocked until an administrator reviews your account.'
+                    : 'This device is awaiting administrator approval. Use your approved device or contact an administrator.',
+                code: nowBlocked ? 'DEVICE_CHANGES_BLOCKED' : 'DEVICE_CHANGE_PENDING'
+            });
         }
 
-        if (deviceResult.isNew) {
-            securityFlags.push('DEVICE_SWITCHING');
-            suspicionScore += 10;
-            await redisService.incrementDeviceSwitches(student._id.toString());
-        }
+    
         validationResults.deviceValid = true;
 
         // ========================================
@@ -463,8 +502,6 @@ export const markAttendance = async (req, res) => {
         // ========================================
 
         // Reload full student document with course assignments
-        const fullStudent = await User.findById(student._id)
-            .select("assignedCourses electiveCourses");
 
         if (!fullStudent) {
             return res.status(404).json({

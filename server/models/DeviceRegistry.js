@@ -48,10 +48,14 @@ const deviceRegistrySchema = new mongoose.Schema({
     // Status
     status: {
         type: String,
-        enum: ['active', 'blocked', 'revoked'],
-        default: 'active'
+        enum: ['active', 'pending', 'blocked', 'revoked', 'rejected'],
+        default: 'pending'
     },
-    blockedReason: String,
+    requestedAt: Date,
+    requestedIp: String,
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: Date,
+    reviewNote: String,
 
     // Trust level
     trustScore: {
@@ -98,6 +102,15 @@ const deviceRegistrySchema = new mongoose.Schema({
 // Compound unique index - one device per student
 deviceRegistrySchema.index({ student: 1, deviceHash: 1 }, { unique: true });
 
+// Enforce exactly one approved device per student
+deviceRegistrySchema.index(
+    { student: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { status: 'active' }
+    }
+);
+
 /**
  * Static: Get student's devices
  */
@@ -121,59 +134,76 @@ deviceRegistrySchema.statics.isDeviceRegistered = async function (studentId, dev
 /**
  * Static: Register or update device
  */
-deviceRegistrySchema.statics.registerDevice = async function (studentId, deviceData) {
+deviceRegistrySchema.statics.checkOrRequestDevice = async function (studentId, deviceData) {
     const { deviceHash, fingerprintComponents, deviceType, browser, os, ip, location } = deviceData;
 
-    // Check existing devices
-    const existingDevices = await this.find({ student: studentId, status: 'active' });
-    const existingDevice = existingDevices.find(d => d.deviceHash === deviceHash);
+    const activeDevice = await this.findOne({ student: studentId, status: 'active' });
 
-    if (existingDevice) {
-        // Update existing device
-        existingDevice.usageCount += 1;
-        existingDevice.lastUsed = new Date();
-        if (location) {
-            existingDevice.lastLocation = location;
-        }
-        await existingDevice.save();
-        return {
-            success: true,
-            device: existingDevice,
-            isNew: false,
-            deviceCount: existingDevices.length
-        };
+    // First device: automatically approve it.
+    if (!activeDevice) {
+        const firstDevice = await this.create({
+            student: studentId,
+            deviceHash,
+            fingerprintComponents,
+            deviceType: deviceType || 'unknown',
+            browser,
+            os,
+            firstSeenIp: ip,
+            firstSeenLocation: location,
+            lastUsed: new Date(),
+            usageCount: 1,
+            status: 'active',
+            registeredAt: new Date()
+        });
+        return { allowed: true, isFirstDevice: true, device: firstDevice };
     }
 
-    // Check device limit (max 3)
-    if (existingDevices.length >= 3) {
-        return {
-            success: false,
-            reason: 'DEVICE_LIMIT_REACHED',
-            deviceCount: existingDevices.length,
-            message: 'Maximum 3 devices allowed per student'
-        };
+    // The approved device is being used.
+    if (activeDevice.deviceHash === deviceHash) {
+        activeDevice.usageCount += 1;
+        activeDevice.lastUsed = new Date();
+        activeDevice.lastLocation = location;
+        await activeDevice.save();
+        return { allowed: true, isFirstDevice: false, device: activeDevice };
     }
 
-    // Register new device
-    const newDevice = await this.create({
-        student: studentId,
-        deviceHash,
-        fingerprintComponents,
-        deviceType: deviceType || 'unknown',
-        browser,
-        os,
-        firstSeenIp: ip,
-        firstSeenLocation: location,
-        lastUsed: new Date(),
-        usageCount: 1
-    });
+    // Do not add a new attempt every time the same unapproved device is retried.
+    const existingRequest = await this.findOne({ student: studentId, deviceHash });
+    if (existingRequest?.status === 'pending') {
+        return { allowed: false, code: 'DEVICE_CHANGE_PENDING', isNewRequest: false };
+    }
 
-    return {
-        success: true,
-        device: newDevice,
-        isNew: true,
-        deviceCount: existingDevices.length + 1
-    };
+    if (existingRequest) {
+        existingRequest.status = 'pending';
+        existingRequest.requestedAt = new Date();
+        existingRequest.requestedIp = ip;
+        existingRequest.fingerprintComponents = fingerprintComponents;
+        existingRequest.deviceType = deviceType || 'unknown';
+        existingRequest.browser = browser;
+        existingRequest.os = os;
+        existingRequest.lastLocation = location;
+        existingRequest.reviewedBy = undefined;
+        existingRequest.reviewedAt = undefined;
+        existingRequest.reviewNote = undefined;
+        await existingRequest.save();
+    } else {
+        await this.create({
+            student: studentId,
+            deviceHash,
+            fingerprintComponents,
+            deviceType: deviceType || 'unknown',
+            browser,
+            os,
+            firstSeenIp: ip,
+            firstSeenLocation: location,
+            lastLocation: location,
+            requestedAt: new Date(),
+            requestedIp: ip,
+            status: 'pending'
+        });
+    }
+
+    return { allowed: false, code: 'DEVICE_CHANGE_PENDING', isNewRequest: true };
 };
 
 /**
