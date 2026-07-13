@@ -234,9 +234,6 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  ✓ Enhanced geolocation validation                ║
 ║  ✓ Rate limiting & abuse detection                ║
 ║  ✓ Comprehensive audit logging                    ║
-╠═══════════════════════════════════════════════════╣
-║   Server: http://localhost:${PORT}                   ║
-║   API:    http://localhost:${PORT}/api               ║
 ╚═══════════════════════════════════════════════════╝
     `);
 

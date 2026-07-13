@@ -1,6 +1,7 @@
 import { User, Course, Session, Attendance, AuditLog, ClaimRequest, ElectiveRequest, DeviceRegistry } from '../models/index.js';
 import fs from "fs";
 import csv from "csv-parser";
+import { BRANCHES } from "../constants/branches.js";
 
 // ============================================
 // PROFESSOR MANAGEMENT (EXISTING)
@@ -215,20 +216,8 @@ export const bulkImportCourses = async (req, res) => {
             failed: []
         };
 
-        const validBranches = [
-            "cs",
-            "it",
-            "stat",
-            "math",
-            "phy",
-            "chem",
-            "bio",
-            "comm",
-            "mgmt",
-            "eco",
-            "eng",
-            "psych"
-        ];
+
+        const validBranches = BRANCHES.map(branch => branch.code);
         const validDays = [
             "Monday",
             "Tuesday",
@@ -274,18 +263,18 @@ export const bulkImportCourses = async (req, res) => {
         // -------------------------------------
 
         const existingCourses = await Course.find({
-            $or: courses.map(c => ({
-                courseCode: c.courseCode,
-                branch: c.branch,
-                semester: c.semester,
-            }))
-        }).select("courseCode branch semester ");
-
-        const existingSet = new Set(
-            existingCourses.map(
-                c => `${c.courseCode}_${c.branch}_${c.semester}`
-            )
+            courseCode: {
+                $in: courses.map(c => c.courseCode)
+            }
+        }).select(
+            "courseCode courseName description branch semester credits"
         );
+
+        const existingMap = new Map();
+
+        existingCourses.forEach(course => {
+            existingMap.set(course.courseCode, course);
+        });
 
         const seen = new Set();
 
@@ -296,86 +285,34 @@ export const bulkImportCourses = async (req, res) => {
         // -------------------------------------
 
         for (const course of courses) {
+            const existing = existingMap.get(course.courseCode);
 
-            const key = `${course.courseCode}_${course.branch}_${course.semester}`;
+            if (existing) {
 
-            if (
-                !course.courseCode ||
-                !course.courseName ||
-                !course.branch ||
-                !course.semester
-            ) {
-                report.failed.push({
-                    row: course.rowNumber,
-                    reason: "Missing required fields"
-                });
-                continue;
-            }
+                const sameExceptSemester =
+                    existing.courseName === course.courseName &&
+                    existing.branch === course.branch &&
+                    (existing.description || "") === (course.description || "");
 
-            if (!validBranches.includes(course.branch)) {
-                report.failed.push({
-                    row: course.rowNumber,
-                    courseCode: course.courseCode,
-                    reason: "Invalid branch"
-                });
-                continue;
-            }
-            validBranches
-            if (course.semester < 1 || course.semester > 8) {
-                report.failed.push({
-                    row: course.rowNumber,
-                    courseCode: course.courseCode,
-                    reason: "Invalid semester"
-                });
-                continue;
-            }
+                if (sameExceptSemester) {
 
-            let invalidSchedule = false;
-
-            for (const sched of course.schedules) {
-
-                if (!validDays.includes(sched.day)) {
-                    report.failed.push({
+                    report.skipped.push({
                         row: course.rowNumber,
                         courseCode: course.courseCode,
-                        reason: `Invalid day ${sched.day}`
+                        reason:
+                            existing.semester === course.semester
+                                ? "Course already exists"
+                                : "Only semester differs (existing course kept)"
                     });
 
-                    invalidSchedule = true;
-                    break;
+                    continue;
                 }
 
-                if (!sched.startTime || !sched.endTime || !sched.room) {
-                    report.failed.push({
-                        row: course.rowNumber,
-                        courseCode: course.courseCode,
-                        reason: "Incomplete schedule"
-                    });
-
-                    invalidSchedule = true;
-                    break;
-                }
-            }
-
-            if (invalidSchedule) continue;
-
-            if (seen.has(key)) {
                 report.failed.push({
                     row: course.rowNumber,
                     courseCode: course.courseCode,
-                    reason: "Duplicate course in CSV"
-                });
-
-                continue;
-            }
-
-            seen.add(key);
-
-            if (existingSet.has(key)) {
-                report.skipped.push({
-                    row: course.rowNumber,
-                    courseCode: course.courseCode,
-                    reason: "Course already exists"
+                    reason:
+                        "Course code already exists with different details"
                 });
 
                 continue;
@@ -469,18 +406,10 @@ export const getAllCourses = async (req, res) => {
  */
 export const getAvailableBranches = async (req, res) => {
     try {
-        const branchCodes = await Course.distinct('branch', {
-            isArchived: false,
-            branch: { $type: 'string', $ne: '' }
+        res.json({
+            success: true,
+            data: BRANCHES
         });
-
-        const data = branchCodes
-            .map(code => code.trim().toLowerCase())
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b))
-            .map(code => ({ code, name: code.toUpperCase() }));
-
-        res.json({ success: true, data });
     } catch (error) {
         console.error('Get Available Branches Error:', error);
         res.status(500).json({ success: false, error: 'Server Error' });

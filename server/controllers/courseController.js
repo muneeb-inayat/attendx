@@ -1,5 +1,5 @@
 import { Course, Session, ClaimRequest, User } from '../models/index.js';
-
+import { BRANCHES } from "../constants/branches.js";
 // ============================================
 // PROFESSOR: GET COURSES
 // ============================================
@@ -10,7 +10,7 @@ import { Course, Session, ClaimRequest, User } from '../models/index.js';
  * @access  Private (Professor)
  */
 export const getCourses = async (req, res) => {
-    try {
+    try {   
         const { archived } = req.query;
 
         const query = { claimedBy: req.user._id };
@@ -78,20 +78,12 @@ export const getClaimableCourses = async (req, res) => {
  * @desc    Get available branches
  * @access  Private (Professor/Admin)
  */
-export const getAvailableBranches = async (req, res) => {
-    try {
-        const branches = await Course.distinct('branch');
+export const getAvailableBranches = (req, res) => {
+   try{ res.json({
+        success: true,
+        data: BRANCHES
+    });
 
-        res.json({
-            success: true,
-            data: branches
-                .filter(Boolean)
-                .sort()
-                .map(branch => ({
-                    code: branch,
-                    name: branch.toUpperCase()
-                }))
-        });
     } catch (error) {
         console.error('Get Branches Error:', error);
 

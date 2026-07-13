@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import API_URL from '../config/api';
+import { generateDeviceFingerprint } from '../utils/deviceFingerprint';
 
 const AuthContext = createContext(null);
 
@@ -53,25 +54,29 @@ export const AuthProvider = ({ children }) => {
         return userData;
     };
 
-            /**
-         * Student Login with Email/Roll Number + Password
-         */
-        const studentLogin = async (identifier, password) => {
+    /**
+  * Student Login with Email/Roll Number + Password
+  */
+    const studentLogin = async (identifier, password) => {
 
-            const res = await axios.post(`${API_URL}/auth/student/login`, {
-                identifier,
-                password
-            });
+        const { fingerprint, components } = generateDeviceFingerprint();
 
-            const { token: newToken, user: userData } = res.data.data;
+        const res = await axios.post(`${API_URL}/auth/student/login`, {
+            identifier,
+            password,
+            deviceFingerprint: fingerprint,
+            fingerprintComponents: components
+        });
 
-            localStorage.setItem("token", newToken);
+        const { token: newToken, user: userData } = res.data.data;
 
-            setToken(newToken);
-            setUser(userData);
+        localStorage.setItem("token", newToken);
 
-            return userData;
-        };
+        setToken(newToken);
+        setUser(userData);
+
+        return userData;
+    };
 
     /**
      * Professor Login with Google (Any email)
@@ -131,10 +136,10 @@ export const AuthProvider = ({ children }) => {
 
             studentLogin,
             loginAsStudent,
-            
+
             loginAsProfessor,
             loginAsAdmin,
-            
+
             loginWithToken,
             logout,
             refreshUser

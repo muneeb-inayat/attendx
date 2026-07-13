@@ -590,30 +590,45 @@ const SessionLive = () => {
                                     {attendees.map(a => (
                                         <div
                                             key={a._id}
-                                            className={`attendee-row ${a.securityFlags?.length > 0 ? 'flagged' : ''}`}
+                                            className={`attendee-card ${a.securityFlags?.length ? "flagged" : ""}`}
                                         >
-                                            <div className="attendee-avatar">
-                                                {a.studentName?.charAt(0)}
+                                            <div className="attendee-left">
+                                                <div className="attendee-avatar">
+                                                    {a.studentName?.charAt(0)?.toUpperCase()}
+                                                </div>
+
+                                                <div className="attendee-details">
+                                                    <h4>{a.studentName}</h4>
+                                                    <p>{a.rollNo}</p>
+                                                </div>
                                             </div>
-                                            <div className="attendee-info">
-                                                <span className="attendee-name">{a.studentName}</span>
-                                                <span className="attendee-roll">{a.rollNo}</span>
-                                            </div>
-                                            <span className={`status-badge ${getStatusBadge(a.status)}`}>
-                                                {a.status}
-                                            </span>
-                                            <span className="attendee-distance">{a.distance}m</span>
-                                            <span className="attendee-time">
-                                                {new Date(a.timestamp).toLocaleTimeString('en-IN', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </span>
-                                            {a.securityFlags?.length > 0 && (
-                                                <span className="flag-icon" title={a.securityFlags.join(', ')}>
-                                                    ⚠️
+
+                                            <div className="attendee-right">
+                                                <span className={`status-badge ${getStatusBadge(a.status)}`}>
+                                                    {a.status}
                                                 </span>
-                                            )}
+
+                                                <div className="attendee-meta">
+                                                    <span>📍 {a.distance} m</span>
+
+                                                    <span>
+                                                        🕒{" "}
+                                                        {new Date(a.timestamp).toLocaleTimeString("en-IN", {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit"
+                                                        })}
+                                                    </span>
+
+                                                    {a.securityFlags?.length > 0 && (
+                                                        <span
+                                                            className="flag-badge"
+                                                            title={a.securityFlags.join(", ")}
+                                                        >
+                                                            ⚠ {a.securityFlags.length}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

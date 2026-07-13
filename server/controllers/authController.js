@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import config from '../config/index.js';
 import bcrypt from 'bcryptjs';
+import { hashDeviceFingerprint, isValidFingerprint } from '../utils/security.js';
+import { evaluateStudentDevice } from '../utils/deviceCheck.js';
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -15,6 +17,26 @@ const generateToken = (user) => {
         config.jwtSecret,
         { expiresIn: config.jwtExpire }
     );
+};
+
+
+const parseDeviceInfo = (userAgent) => {
+    if (!userAgent) return { deviceType: 'unknown', browser: 'unknown', os: 'unknown' };
+    let deviceType = 'desktop';
+    if (/mobile/i.test(userAgent)) deviceType = 'mobile';
+    else if (/tablet|ipad/i.test(userAgent)) deviceType = 'tablet';
+    let browser = 'unknown';
+    if (/chrome/i.test(userAgent)) browser = 'Chrome';
+    else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+    else if (/safari/i.test(userAgent)) browser = 'Safari';
+    else if (/edge/i.test(userAgent)) browser = 'Edge';
+    let os = 'unknown';
+    if (/android/i.test(userAgent)) os = 'Android';
+    else if (/iphone|ipad|ios/i.test(userAgent)) os = 'iOS';
+    else if (/windows/i.test(userAgent)) os = 'Windows';
+    else if (/mac/i.test(userAgent)) os = 'macOS';
+    else if (/linux/i.test(userAgent)) os = 'Linux';
+    return { deviceType, browser, os };
 };
 
 /**
@@ -130,12 +152,19 @@ export const studentGoogleLogin = async (req, res) => {
 export const studentLogin = async (req, res) => {
     try {
 
-        const { identifier, password } = req.body;
+        const { identifier, password, deviceFingerprint, fingerprintComponents } = req.body;
 
         if (!identifier || !password) {
             return res.status(400).json({
                 success: false,
                 error: "Email/Roll No and password are required"
+            });
+        }
+
+        if (!deviceFingerprint || !isValidFingerprint(deviceFingerprint)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid or missing device information. Please refresh and try again."
             });
         }
 
@@ -169,6 +198,32 @@ export const studentLogin = async (req, res) => {
             return res.status(401).json({
                 success: false,
                 error: "Invalid credentials"
+            });
+        }
+
+        // ========================================
+        // Device gate — unapproved/blocked devices never receive a token
+        // ========================================
+        const deviceHash = hashDeviceFingerprint(deviceFingerprint);
+        const { deviceType, browser, os } = parseDeviceInfo(req.headers['user-agent']);
+
+        const deviceCheck = await evaluateStudentDevice({
+            studentId: user._id,
+            deviceHash,
+            fingerprintComponents: fingerprintComponents || {},
+            deviceType,
+            browser,
+            os,
+            ip: req.ip || req.connection?.remoteAddress,
+            location: null,
+            currentDeviceSecurity: user.deviceSecurity
+        });
+
+        if (!deviceCheck.ok) {
+            return res.status(deviceCheck.status).json({
+                success: false,
+                error: deviceCheck.error,
+                code: deviceCheck.code
             });
         }
 
