@@ -20,6 +20,15 @@ const BRANCH_OPTIONS = [
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const ProfessorDashboard = () => {
+    const [overrideSession, setOverrideSession] = useState(null);
+    const [overrideStudents, setOverrideStudents] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [overrideStatus, setOverrideStatus] = useState('PRESENT');
+    const [overrideReason, setOverrideReason] = useState('');
+    const [loadingOverrideStudents, setLoadingOverrideStudents] = useState(false);
+    const [savingOverride, setSavingOverride] = useState(false);
+
+
     const { user, token, logout } = useAuth();
     const navigate = useNavigate();
     const navState = useLocation();
@@ -254,6 +263,56 @@ const ProfessorDashboard = () => {
             <div className="skeleton-line shimmer"></div>
         </div>
     );
+
+    const openOverrideModal = async (event, session) => {
+        event.stopPropagation();
+        setOverrideSession(session);
+        setSelectedStudentId('');
+        setOverrideStatus('PRESENT');
+        setOverrideReason('');
+        setLoadingOverrideStudents(true);
+
+        try {
+            const res = await axios.get(
+                `${API_URL}/attendance/session/${session._id}/eligible-students`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setOverrideStudents(res.data.data || []);
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Could not load enrolled students');
+            setOverrideSession(null);
+        } finally {
+            setLoadingOverrideStudents(false);
+        }
+    };
+
+    const saveAttendanceOverride = async event => {
+        event.preventDefault();
+        if (!overrideSession || !selectedStudentId || overrideReason.trim().length < 3) {
+            toast.error('Select a student and enter a reason of at least 3 characters');
+            return;
+        }
+
+        setSavingOverride(true);
+        try {
+            const res = await axios.put(
+                `${API_URL}/attendance/session/${overrideSession._id}/override`,
+                {
+                    studentId: selectedStudentId,
+                    status: overrideStatus,
+                    reason: overrideReason.trim()
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success(res.data.message || 'Attendance updated');
+            setOverrideSession(null);
+            await fetchData();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Could not update attendance');
+        } finally {
+            setSavingOverride(false);
+        }
+    };
 
     return (
         <div className="professor-dashboard">
@@ -613,6 +672,15 @@ const ProfessorDashboard = () => {
                                                             })}
                                                         </span>
                                                     </div>
+                                                    {!session.isActive && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            onClick={event => openOverrideModal(event, session)}
+                                                        >
+                                                            Override attendance
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -908,6 +976,83 @@ const ProfessorDashboard = () => {
                                 </div>
                             </form>
                         )}
+                    </div>
+                </div>
+            )}
+            {overrideSession && (
+                <div className="modal-overlay" onClick={() => setOverrideSession(null)}>
+                    <div className="modal glass-modal" onClick={event => event.stopPropagation()}>
+                        <div className="modal-header">
+                            <div>
+                                <h2>Override attendance</h2>
+                                <p>
+                                    {overrideSession.course?.courseCode} — {overrideSession.course?.courseName}
+                                </p>
+                            </div>
+                            <button className="modal-close" onClick={() => setOverrideSession(null)}>×</button>
+                        </div>
+
+                        <form onSubmit={saveAttendanceOverride}>
+                            <div className="modal-body">
+                                {loadingOverrideStudents ? (
+                                    <p>Loading enrolled students…</p>
+                                ) : (
+                                    <>
+                                        <div className="form-group">
+                                            <label>Student</label>
+                                            <select
+                                                className="form-input"
+                                                value={selectedStudentId}
+                                                onChange={event => setSelectedStudentId(event.target.value)}
+                                                required
+                                            >
+                                                <option value="">Choose a student…</option>
+                                                {overrideStudents.map(student => (
+                                                    <option key={student._id} value={student._id}>
+                                                        {student.rollNo || 'No roll no.'} — {student.name}
+                                                        {student.attendance ? ` (${student.attendance.status})` : ' (No record)'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Attendance status</label>
+                                            <select
+                                                className="form-input"
+                                                value={overrideStatus}
+                                                onChange={event => setOverrideStatus(event.target.value)}
+                                            >
+                                                <option value="PRESENT">Present</option>
+                                                <option value="LATE">Late</option>
+                                                <option value="ABSENT">Absent</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Reason</label>
+                                            <textarea
+                                                className="form-input"
+                                                rows="3"
+                                                value={overrideReason}
+                                                onChange={event => setOverrideReason(event.target.value)}
+                                                placeholder="Why is this attendance being changed?"
+                                                required
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn btn-ghost" onClick={() => setOverrideSession(null)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-success" disabled={loadingOverrideStudents || savingOverride}>
+                                    {savingOverride ? 'Saving…' : 'Save override'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

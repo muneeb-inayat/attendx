@@ -1745,6 +1745,197 @@ export const rejectAllFailedAttempts = async (req, res) => {
     }
 };
 
+const professorOwnsSession = (session, user) => {
+    if (user.role === 'admin') return true;
+    return session.course?.claimedBy?.some(
+        professorId => professorId.toString() === user._id.toString()
+    );
+};
+
+const isAttendedStatus = status => ['PRESENT', 'LATE', 'SUSPICIOUS'].includes(status);
+
+/**
+ * GET /api/attendance/session/:sessionId/eligible-students
+ * Returns every student enrolled in the session's course, including students
+ * with no QR attendance record yet.
+ */
+export const getEligibleStudentsForSession = async (req, res) => {
+    try {
+        const session = await Session.findById(req.params.sessionId)
+            .populate('course', 'courseName courseCode claimedBy');
+
+        if (!session) {
+            return res.status(404).json({ success: false, error: 'Session not found' });
+        }
+        if (!professorOwnsSession(session, req.user)) {
+            return res.status(403).json({ success: false, error: 'Not authorized for this session' });
+        }
+
+        const students = await User.find({
+            role: 'student',
+            $or: [
+                { assignedCourses: session.course._id },
+                { electiveCourses: session.course._id }
+            ]
+        })
+            .select('name rollNo email branch')
+            .sort({ name: 1 });
+
+        const records = await Attendance.find({
+            session: session._id,
+            student: { $in: students.map(student => student._id) }
+        }).select('student status notes markedBy verifiedBy overrideHistory');
+
+        const recordByStudent = new Map(
+            records.map(record => [record.student.toString(), record])
+        );
+
+        res.json({
+            success: true,
+            data: students.map(student => {
+                const record = recordByStudent.get(student._id.toString());
+                return {
+                    ...student.toObject(),
+                    attendance: record ? {
+                        _id: record._id,
+                        status: record.status,
+                        notes: record.notes,
+                        markedBy: record.markedBy,
+                        overrideHistory: record.overrideHistory
+                    } : null
+                };
+            })
+        });
+    } catch (error) {
+        console.error('Get Eligible Students Error:', error);
+        res.status(500).json({ success: false, error: 'Server Error' });
+    }
+};
+
+/**
+ * PUT /api/attendance/session/:sessionId/override
+ * Body: { studentId, status: 'PRESENT'|'LATE'|'ABSENT', reason }
+ */
+export const overrideAttendance = async (req, res) => {
+    try {
+        const { studentId, status, reason } = req.body;
+        const allowedStatuses = ['PRESENT', 'LATE', 'ABSENT'];
+        const cleanReason = reason?.trim();
+
+        if (!studentId || !allowedStatuses.includes(status) || !cleanReason || cleanReason.length < 3) {
+            return res.status(400).json({
+                success: false,
+                error: 'Student, attendance status, and a reason of at least 3 characters are required'
+            });
+        }
+
+        const session = await Session.findById(req.params.sessionId)
+            .populate('course', 'courseName courseCode claimedBy');
+        if (!session) {
+            return res.status(404).json({ success: false, error: 'Session not found' });
+        }
+        if (!professorOwnsSession(session, req.user)) {
+            return res.status(403).json({ success: false, error: 'Not authorized for this session' });
+        }
+
+        const student = await User.findOne({
+            _id: studentId,
+            role: 'student',
+            $or: [
+                { assignedCourses: session.course._id },
+                { electiveCourses: session.course._id }
+            ]
+        }).select('name rollNo');
+        if (!student) {
+            return res.status(400).json({
+                success: false,
+                error: 'Student is not enrolled in this course'
+            });
+        }
+
+        let attendance = await Attendance.findOne({ session: session._id, student: student._id });
+        const previousStatus = attendance?.status || null;
+
+        if (attendance) {
+            attendance.overrideHistory.push({
+                previousStatus,
+                newStatus: status,
+                reason: cleanReason,
+                overriddenBy: req.user._id
+            });
+            attendance.status = status;
+            attendance.markedBy = 'professor';
+            attendance.verifiedBy = req.user._id;
+            attendance.notes = `Professor override: ${cleanReason}`;
+            await attendance.save();
+        } else {
+            // Required technical fields are deliberately unique for this manual record.
+            // This avoids colliding with the schema's session/device unique index.
+            const manualFingerprint = `manual-override:${session._id}:${student._id}`;
+            attendance = await Attendance.create({
+                session: session._id,
+                student: student._id,
+                studentName: student.name,
+                rollNo: student.rollNo || 'N/A',
+                status,
+                timestamp: new Date(),
+                location: { latitude: 0, longitude: 0 },
+                latitude: 0,
+                longitude: 0,
+                distance: 0,
+                deviceFingerprint: manualFingerprint,
+                deviceHash: manualFingerprint,
+                deviceType: 'unknown',
+                markedBy: 'professor',
+                verifiedBy: req.user._id,
+                notes: `Professor override: ${cleanReason}`,
+                overrideHistory: [{
+                    previousStatus: null,
+                    newStatus: status,
+                    reason: cleanReason,
+                    overriddenBy: req.user._id
+                }]
+            });
+        }
+
+        const attendanceDelta = (isAttendedStatus(status) ? 1 : 0)
+            - (isAttendedStatus(previousStatus) ? 1 : 0);
+        if (attendanceDelta !== 0) {
+            await Session.findByIdAndUpdate(session._id, {
+                $inc: { attendanceCount: attendanceDelta },
+                lastAttendanceAt: new Date()
+            });
+        }
+
+        // Add ATTENDANCE_OVERRIDDEN to AuditLog's event enum if that schema restricts eventType.
+        await AuditLog.log({
+            eventType: 'ATTENDANCE_OVERRIDDEN',
+            userId: student._id,
+            userEmail: req.user.email,
+            userRole: req.user.role,
+            sessionId: session._id,
+            courseId: session.course._id,
+            metadata: {
+                previousStatus,
+                newStatus: status,
+                reason: cleanReason,
+                overriddenBy: req.user._id
+            }
+        });
+
+        res.json({
+            success: true,
+            message: `Attendance updated for ${student.name}`,
+            data: attendance
+        });
+    } catch (error) {
+        console.error('Override Attendance Error:', error);
+        res.status(500).json({ success: false, error: 'Server Error' });
+    }
+};
+
+
+
 export default {
     markAttendance,
     getMyAttendance,
@@ -1759,5 +1950,7 @@ export default {
     acceptFailedAttempt,
     rejectFailedAttempt,
     acceptAllFailedAttempts,
-    rejectAllFailedAttempts
+    rejectAllFailedAttempts,
+    getEligibleStudentsForSession,
+    overrideAttendance,
 };

@@ -34,6 +34,11 @@ const attendanceSchema = new mongoose.Schema({
         enum: ['PRESENT', 'LATE', 'SUSPICIOUS', 'REJECTED'],
         default: 'PRESENT'
     },
+    markedBy: {
+        type: String,
+        enum: ['self', 'professor', 'admin', 'system'],
+        default: 'self'
+    },
 
     // Timing information
     timestamp: {
@@ -125,7 +130,7 @@ const attendanceSchema = new mongoose.Schema({
             "TOKEN_REPLAY_ATTEMPT",
             "MULTI_STUDENT_DEVICE",
             "TOO_MANY_DEVICES"
-        ]   
+        ]
     }],
     suspicionScore: {
         type: Number,
@@ -135,17 +140,37 @@ const attendanceSchema = new mongoose.Schema({
     // Administrative
     markedBy: {
         type: String,
-        enum: ['self', 'admin', 'system'],
+        enum: ['self', 'professor', 'admin', 'system'],
         default: 'self'
     },
     verifiedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+
+    overrideHistory: [{
+        previousStatus: {
+            type: String,
+            enum: ['PRESENT', 'LATE', 'SUSPICIOUS', 'REJECTED', 'ABSENT', null]
+        },
+        newStatus: {
+            type: String,
+            enum: ['PRESENT', 'LATE', 'ABSENT'],
+            required: true
+        },
+        reason: { type: String, required: true, trim: true },
+        overriddenBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        overriddenAt: { type: Date, default: Date.now }
+    }],
     notes: String
-}, {
-    timestamps: true
-});
+
+
+},
+
+    {
+        timestamps: true
+    });
+
 
 // Unique constraints - one attendance per student per session
 attendanceSchema.index({ session: 1, student: 1 }, { unique: true });
@@ -180,27 +205,29 @@ attendanceSchema.pre('save', async function (next) {
  */
 attendanceSchema.statics.getSessionStats = async function (sessionId) {
     const records = await this.find({ session: sessionId });
+    const attendedStatuses = new Set(['PRESENT', 'LATE', 'SUSPICIOUS']);
+    const attended = records.filter(record => attendedStatuses.has(record.status));
 
     const stats = {
-        total: records.length,
-        present: records.filter(r => r.status === 'PRESENT').length,
-        late: records.filter(r => r.status === 'LATE').length,
-        suspicious: records.filter(r => r.status === 'SUSPICIOUS').length,
-        rejected: records.filter(r => r.status === 'REJECTED').length,
-        flagged: records.filter(r => r.securityFlags?.length > 0).length,
+        total: attended.length,
+        present: records.filter(record => record.status === 'PRESENT').length,
+        late: records.filter(record => record.status === 'LATE').length,
+        suspicious: records.filter(record => record.status === 'SUSPICIOUS').length,
+        rejected: records.filter(record => record.status === 'REJECTED').length,
+        absent: records.filter(record => record.status === 'ABSENT').length,
+        flagged: records.filter(record => record.securityFlags?.length > 0).length,
         averageDistance: 0,
         averageMinutesAfterStart: 0
     };
 
-    if (records.length > 0) {
+    if (attended.length > 0) {
         stats.averageDistance = Math.round(
-            records.reduce((sum, r) => sum + (r.distance || 0), 0) / records.length
+            attended.reduce((sum, record) => sum + (record.distance || 0), 0) / attended.length
         );
         stats.averageMinutesAfterStart = Math.round(
-            records.reduce((sum, r) => sum + (r.minutesAfterStart || 0), 0) / records.length
+            attended.reduce((sum, record) => sum + (record.minutesAfterStart || 0), 0) / attended.length
         );
     }
-
     return stats;
 };
 

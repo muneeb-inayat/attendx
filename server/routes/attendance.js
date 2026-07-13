@@ -13,7 +13,9 @@ import {
     acceptFailedAttempt,
     rejectFailedAttempt,
     acceptAllFailedAttempts,
-    rejectAllFailedAttempts
+    rejectAllFailedAttempts,
+    getEligibleStudentsForSession,
+    overrideAttendance,
 } from '../controllers/attendanceController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { rateLimitAttendance } from '../middleware/rateLimiter.js';
@@ -76,6 +78,19 @@ router.get('/suspicious', authorize('admin'), getSuspiciousAttendance);
 
 // Get student audit log
 router.get('/audit/:studentId', authorize('admin'), getStudentAudit);
+
+
+router.get(
+    '/session/:sessionId/eligible-students',
+    authorize('professor', 'admin'),
+    getEligibleStudentsForSession
+);
+
+router.put(
+    '/session/:sessionId/override',
+    authorize('professor', 'admin'),
+    overrideAttendance
+);
 
 export default router;
 
