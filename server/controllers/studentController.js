@@ -11,18 +11,10 @@ export const getStudents = async (req, res) => {
         const students = await User.find({ role: "student" })
             .sort({ rollNo: 1 })
             .select("-googleId");
-
-        // Get unique batches
-        const batches = [...new Set(
-            students
-                .map(s => s.batch)
-                .filter(Boolean)
-        )];
-
+        
         res.json({
             success: true,
             data: students,
-            batches
         });
 
     } catch (error) {
@@ -67,7 +59,6 @@ export const bulkImportStudents = async (req, res) => {
                         branch: row.branch?.trim().toLowerCase(),
                         admissionYear: Number(row.admissionYear),
                         semester: Number(row.semester),
-                        batch: row.batch?.trim()
                     });
                 })
                 .on('end', () => resolve(data))
@@ -105,7 +96,7 @@ export const bulkImportStudents = async (req, res) => {
 
         const allCourses = await Course.find({
             isArchived: false
-        }).select("_id branch semester batch");
+        }).select("_id branch semester ");
 
         console.log(allCourses);
 
@@ -118,8 +109,7 @@ export const bulkImportStudents = async (req, res) => {
                 !student.email ||
                 !student.rollNo ||
                 !student.branch ||
-                !student.admissionYear ||
-                !student.batch
+                !student.admissionYear 
             ) {
                 report.failed.push({
                     row: i + 2,
@@ -128,15 +118,6 @@ export const bulkImportStudents = async (req, res) => {
                 continue;
             }
 
-            // Batch validation
-            if (!['1', '2', '3', '4', '5'].includes(student.batch)) {
-                report.failed.push({
-                    row: i + 2,
-                    rollNo: student.rollNo,
-                    reason: 'Invalid batch'
-                });
-                continue;
-            }
 
             // Admission year validation
             if (
@@ -205,16 +186,11 @@ export const bulkImportStudents = async (req, res) => {
             console.log("Student:", {
                 branch: student.branch,
                 semester: student.semester,
-                batch: student.batch
             });
 
             const assignedCourses = allCourses.filter(course =>
                 course.branch === student.branch &&
-                course.semester === student.semester &&
-                (
-                    course.batch === "all" ||
-                    course.batch === student.batch
-                )
+                course.semester === student.semester                
             );
 
             console.log(

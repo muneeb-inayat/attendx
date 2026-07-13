@@ -4,7 +4,6 @@ import {
     professorGoogleLogin,
     getMe,
     adminLogin,
-    updateBatch,
     studentLogin,
     deleteAccount,
     changePassword
@@ -32,9 +31,6 @@ router.post('/admin/login', adminLogin);
 
 // Get current user
 router.get('/me', protect, getMe);
-
-// Update student batch
-router.put('/batch', protect, updateBatch);
 
 // Delete own account
 router.delete('/delete-account', protect, deleteAccount);

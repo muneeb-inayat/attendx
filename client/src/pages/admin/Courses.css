@@ -532,11 +532,6 @@
     background: var(--primary-muted);
 }
 
-.meta-tag.batch {
-    color: var(--warning);
-    background: var(--warning-muted);
-}
-
 .course-schedules {
     display: flex;
     flex-wrap: wrap;

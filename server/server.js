@@ -39,18 +39,18 @@ app.set('trust proxy', 1);
 // CORS configuration
 
 const allowedOrigins = [
-  config.frontendUrl,config.frontendUrl2
+    config.frontendUrl, config.frontendUrl2
 ];
 
 app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true
 }));
 
 // app.use(cors({
@@ -82,16 +82,16 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // API ROUTES
 // ============================================
 
-    // Authentication (Google Only)
-    app.use('/api/auth', authRoutes);
-    // Admin Management
-    app.use('/api/admin', adminRoutes);
+// Authentication (Google Only)
+app.use('/api/auth', authRoutes);
+// Admin Management
+app.use('/api/admin', adminRoutes);
 
-    // Course Management (Professor)
-    app.use('/api/courses', courseRoutes);
+// Course Management (Professor)
+app.use('/api/courses', courseRoutes);
 
-    // Session Management (Professor)
-    app.use('/api/sessions', sessionRoutes);
+// Session Management (Professor)
+app.use('/api/sessions', sessionRoutes);
 
 // Attendance Marking & Tracking
 app.use('/api/attendance', attendanceRoutes);
@@ -225,7 +225,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔═══════════════════════════════════════════════════╗
 ║     QR Attendance System - Secure Backend         ║
-║           Version 4.0.0-secure                    ║
+║           Version 1.0-secure                      ║
 ╠═══════════════════════════════════════════════════╣
 ║  Security Features:                               ║
 ║  ✓ HMAC-based rotating QR tokens                  ║
@@ -235,8 +235,8 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  ✓ Rate limiting & abuse detection                ║
 ║  ✓ Comprehensive audit logging                    ║
 ╠═══════════════════════════════════════════════════╣
-║  Server: http://localhost:${PORT}                 ║
-║  API:    http://localhost:${PORT}/api             ║
+║   Server: http://localhost:${PORT}                   ║
+║   API:    http://localhost:${PORT}/api               ║
 ╚═══════════════════════════════════════════════════╝
     `);
 

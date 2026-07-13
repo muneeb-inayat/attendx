@@ -10,9 +10,7 @@ const Students = () => {
     const { token } = useAuth();
 
     const [students, setStudents] = useState([]);
-    const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedBatch, setSelectedBatch] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
 
@@ -24,19 +22,17 @@ const Students = () => {
 
     useEffect(() => {
         fetchStudents();
-    }, [selectedBatch, searchQuery]);
+    }, [ searchQuery]);
 
     const fetchStudents = async () => {
         try {
             const params = new URLSearchParams();
-            if (selectedBatch) params.append('batch', selectedBatch);
             if (searchQuery) params.append('search', searchQuery);
 
             const res = await axios.get(`${API_URL}/students?${params}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setStudents(res.data.data || []);
-            setBatches(res.data.batches || []);
         } catch (error) {
             console.error('Failed to fetch students:', error);
         } finally {
@@ -146,16 +142,7 @@ const Students = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
-                    <select
-                        className="form-input batch-select"
-                        value={selectedBatch}
-                        onChange={(e) => setSelectedBatch(e.target.value)}
-                    >
-                        <option value="">All Batches</option>
-                        {batches.map(batch => (
-                            <option key={batch} value={batch}>{batch}</option>
-                        ))}
-                    </select>
+                    
                 </div>
 
                 {/* Stats */}
@@ -164,10 +151,7 @@ const Students = () => {
                         <span className="stat-value">{students.length}</span>
                         <span className="stat-label">Students</span>
                     </div>
-                    <div className="stat-item">
-                        <span className="stat-value">{batches.length}</span>
-                        <span className="stat-label">Batches</span>
-                    </div>
+                    
                 </div>
 
                 {/* Student List */}
@@ -193,7 +177,6 @@ const Students = () => {
                                     <th>Roll No</th>
                                     <th>Name</th>
                                     <th>Email</th>
-                                    <th>Batch</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -203,11 +186,6 @@ const Students = () => {
                                         <td><strong>{student.rollNo}</strong></td>
                                         <td>{student.name}</td>
                                         <td>{student.email || '-'}</td>
-                                        <td>
-                                            {student.batch ? (
-                                                <span className="batch-tag">{student.batch}</span>
-                                            ) : '-'}
-                                        </td>
                                         <td>
                                             <button
                                                 className="btn-icon delete"

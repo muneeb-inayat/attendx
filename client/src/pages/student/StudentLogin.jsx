@@ -12,7 +12,6 @@ const StudentLogin = () => {
         email: '',
         password: '',
         phone: '',
-        batch: ''
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,7 +36,6 @@ const StudentLogin = () => {
                     formData.email,
                     formData.password,
                     formData.phone,
-                    formData.batch
                 );
             } else {
                 await login(formData.email, formData.password);
@@ -113,18 +111,7 @@ const StudentLogin = () => {
                                             disabled={loading}
                                         />
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Batch (Optional)</label>
-                                        <input
-                                            type="text"
-                                            name="batch"
-                                            className="form-input"
-                                            placeholder="e.g., 2024"
-                                            value={formData.batch}
-                                            onChange={handleChange}
-                                            disabled={loading}
-                                        />
-                                    </div>
+                                    
                                 </div>
 
                                 <div className="form-group">

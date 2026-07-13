@@ -18,7 +18,6 @@ const StudentDashboard = () => {
     const [timetable, setTimetable] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
-    const [savingBatch, setSavingBatch] = useState(false);
     const [selectedDay, setSelectedDay] = useState(() => {
         const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
         return DAYS.includes(today) ? today : 'Monday';
@@ -54,22 +53,7 @@ const StudentDashboard = () => {
         return 'danger';
     };
 
-    const handleBatchChange = async (newBatch) => {
-        if (!newBatch || savingBatch) return;
-        setSavingBatch(true);
-        try {
-            await axios.put(`${API_URL}/auth/batch`, { batch: newBatch }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            toast.success(`Batch updated to ${newBatch}`);
-            if (refreshUser) await refreshUser();
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to update batch');
-        } finally {
-            setSavingBatch(false);
-        }
-    };
+
 
     const allCourses = [...(courses.autoEnrolled || []), ...(courses.electives || [])];
 
@@ -430,9 +414,7 @@ const StudentDashboard = () => {
                                         <div className="timetable-badges">
                                             <span className="info-badge branch">{timetable.academicInfo.branch?.toUpperCase()}</span>
                                             <span className="info-badge year">Year {timetable.academicInfo.year}</span>
-                                            {timetable.academicInfo.batch && (
-                                                <span className="info-badge batch">Batch {timetable.academicInfo.batch}</span>
-                                            )}
+                                        
                                         </div>
                                     )}
                                 </div>
@@ -441,7 +423,6 @@ const StudentDashboard = () => {
                                     <div className="empty-state-card">
                                         <span className="empty-icon">📭</span>
                                         <p>No timetable available yet</p>
-                                        {!user?.batch && <span className="empty-hint">⚠️ Set your batch first!</span>}
                                     </div>
                                 ) : (
                                     <>
@@ -493,9 +474,7 @@ const StudentDashboard = () => {
                                                                 <span className="timeline-code">{slot.course?.courseCode}</span>
                                                                 <h5 className="timeline-name">{slot.course?.courseName}</h5>
                                                                 {slot.room && <span className="timeline-room">📍 {slot.room}</span>}
-                                                                {slot.course?.batch && slot.course.batch !== 'all' && (
-                                                                    <span className="timeline-batch">Batch {slot.course.batch}</span>
-                                                                )}
+                                                                
                                                             </div>
                                                         </div>
                                                     ))}

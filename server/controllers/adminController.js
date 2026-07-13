@@ -105,7 +105,6 @@ export const createCourse = async (req, res) => {
             branch,
             year,
             semester,
-            batch,
             schedules,
             schedule, // Support legacy single schedule
             defaultLocation,
@@ -114,7 +113,7 @@ export const createCourse = async (req, res) => {
         } = req.body;
 
         // Validate required fields
-        if (!courseCode || !courseName || !branch || !year || !semester) {
+        if (!courseCode || !courseName || !branch || !semester) {
             return res.status(400).json({
                 success: false,
                 error: 'Please provide courseCode, courseName, branch, year, and semester'
@@ -128,18 +127,17 @@ export const createCourse = async (req, res) => {
             courseSchedules = [schedule];
         }
 
-        // Check if course already exists for this branch/year/batch combination
+        // Check if course already exists for this branch/year combination
         const existingCourse = await Course.findOne({
             courseCode: courseCode.toUpperCase(),
             branch: branch.toLowerCase(),
             year,
-            batch: batch || 'all'
         });
 
         if (existingCourse) {
             return res.status(400).json({
                 success: false,
-                error: 'Course with this code already exists for this branch, year, and batch'
+                error: 'Course with this code already exists for this branch, year'
             });
         }
 
@@ -150,7 +148,6 @@ export const createCourse = async (req, res) => {
             branch: branch.toLowerCase(),
             year,
             semester,
-            batch: batch || 'all',
             schedules: courseSchedules,
             defaultLocation,
             defaultDuration,
@@ -200,7 +197,6 @@ export const bulkImportCourses = async (req, res) => {
                         description: row.description?.trim() || "",
                         branch: row.branch?.trim().toLowerCase(),
                         semester: Number(row.semester),
-                        batch: row.batch?.trim().toLowerCase() || "all",
 
                         day: row.day?.trim(),
                         startTime: row.startTime?.trim(),
@@ -241,7 +237,6 @@ export const bulkImportCourses = async (req, res) => {
             "Friday",
             "Saturday"
         ];
-        const validBatches = ["all", "1", "2", "3", "4", "5"];
 
         // -------------------------------------
         // Group rows by course
@@ -250,7 +245,7 @@ export const bulkImportCourses = async (req, res) => {
         const groupedCourses = new Map();
 
         rows.forEach((row, index) => {
-            const key = `${row.courseCode}_${row.branch}_${row.semester}_${row.batch}`;
+            const key = `${row.courseCode}_${row.branch}_${row.semester}`;
 
             if (!groupedCourses.has(key)) {
                 groupedCourses.set(key, {
@@ -259,9 +254,7 @@ export const bulkImportCourses = async (req, res) => {
                     courseName: row.courseName,
                     description: row.description,
                     branch: row.branch,
-                    credits: Number(row.credits) || 4,
                     semester: row.semester,
-                    batch: row.batch,
                     schedules: []
                 });
             }
@@ -285,13 +278,12 @@ export const bulkImportCourses = async (req, res) => {
                 courseCode: c.courseCode,
                 branch: c.branch,
                 semester: c.semester,
-                batch: c.batch
             }))
-        }).select("courseCode branch semester batch");
+        }).select("courseCode branch semester ");
 
         const existingSet = new Set(
             existingCourses.map(
-                c => `${c.courseCode}_${c.branch}_${c.semester}_${c.batch}`
+                c => `${c.courseCode}_${c.branch}_${c.semester}`
             )
         );
 
@@ -305,7 +297,7 @@ export const bulkImportCourses = async (req, res) => {
 
         for (const course of courses) {
 
-            const key = `${course.courseCode}_${course.branch}_${course.semester}_${course.batch}`;
+            const key = `${course.courseCode}_${course.branch}_${course.semester}`;
 
             if (
                 !course.courseCode ||
@@ -334,15 +326,6 @@ export const bulkImportCourses = async (req, res) => {
                     row: course.rowNumber,
                     courseCode: course.courseCode,
                     reason: "Invalid semester"
-                });
-                continue;
-            }
-
-            if (!validBatches.includes(course.batch)) {
-                report.failed.push({
-                    row: course.rowNumber,
-                    courseCode: course.courseCode,
-                    reason: "Invalid batch"
                 });
                 continue;
             }
@@ -403,9 +386,7 @@ export const bulkImportCourses = async (req, res) => {
                 courseName: course.courseName,
                 description: course.description,
                 branch: course.branch,
-                credits: course.credits,
                 semester: course.semester,
-                batch: course.batch,
                 schedules: course.schedules,
                 createdBy: req.user._id,
                 claimedBy: []
@@ -527,9 +508,7 @@ export const updateCourse = async (req, res) => {
             'branch',
             'courseName',
             'description',
-            'credits',
             'semester',
-            'batch',
             'schedules',
             'defaultLocation',
             'defaultDuration',

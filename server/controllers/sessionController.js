@@ -399,7 +399,7 @@ export const stopSession = async (req, res) => {
 export const getStudentSessionInfo = async (req, res) => {
     try {
         const session = await Session.findById(req.params.id)
-            .populate('course', 'courseName courseCode branch semester batch');
+            .populate('course', 'courseName courseCode branch semester ');
 
         if (!session) {
             return res.status(404).json({

@@ -108,7 +108,6 @@ export const studentGoogleLogin = async (req, res) => {
                     rollNo: user.rollNo,
                     branch: user.branch,
                     branchCode: user.branchCode,
-                    batch: user.batch,
                     admissionYear: user.admissionYear,
                     academicState: user.academicState,
                     assignedCourses: user.assignedCourses,
@@ -185,7 +184,6 @@ export const studentLogin = async (req, res) => {
                     role: user.role,
                     rollNo: user.rollNo,
                     branch: user.branch,
-                    batch: user.batch,
                     admissionYear: user.admissionYear,
                     academicState: user.academicState,
                     assignedCourses: user.assignedCourses,
@@ -463,43 +461,6 @@ export const adminLogin = async (req, res) => {
     }
 };
 
-/**
- * @route   PUT /api/auth/batch
- * @desc    Update student's batch
- * @access  Private (Student)
- */
-export const updateBatch = async (req, res) => {
-    try {
-        const { batch } = req.body;
-
-        if (!['1', '2', '3', '4', '5'].includes(batch)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid batch. Must be 1, 2, 3, 4, or 5'
-            });
-        }
-
-        const user = await User.findByIdAndUpdate(
-            req.user._id,
-            { batch },
-            { new: true }
-        );
-
-        res.json({
-            success: true,
-            message: 'Batch updated successfully',
-            data: {
-                batch: user.batch
-            }
-        });
-    } catch (error) {
-        console.error('Update Batch Error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update batch'
-        });
-    }
-};
 
 /**
  * @route   DELETE /api/auth/delete-account

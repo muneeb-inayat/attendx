@@ -61,13 +61,7 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: null
     },
-    // Student's batch (1-5 for lab divisions)
-    batch: {
-        type: String,
-        enum: ['1', '2', '3', '4', '5'],
-        default: null
-    },
-
+  
     // For non-standard MNIT emails that need admin review
     pendingReview: {
         type: Boolean,

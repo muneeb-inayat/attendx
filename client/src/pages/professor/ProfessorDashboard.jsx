@@ -32,7 +32,7 @@ const ProfessorDashboard = () => {
     const [pastSessions, setPastSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('courses');
-    const [browseFilter, setBrowseFilter] = useState({ branch: '', year: '', batch: '' });
+    const [browseFilter, setBrowseFilter] = useState({ branch: '', year: '' });
 
     // Session Modal State
     const [showSessionModal, setShowSessionModal] = useState(false);
@@ -141,7 +141,6 @@ const ProfessorDashboard = () => {
             const params = new URLSearchParams();
             if (browseFilter.branch) params.append('branch', browseFilter.branch);
             if (browseFilter.year) params.append('year', browseFilter.year);
-            if (browseFilter.batch) params.append('batch', browseFilter.batch);
             const res = await axios.get(`${API_URL}/courses/claimable?${params}`, { headers });
             setClaimableCourses(res.data.data || []);
         } catch (error) {
@@ -513,9 +512,7 @@ const ProfessorDashboard = () => {
                                             <div key={course._id} className="course-card">
                                                 <div className="course-header">
                                                     <span className="course-code">{course.courseCode}</span>
-                                                    <span className="course-batch">
-                                                        {course.batch === 'all' ? 'All Batches' : `Batch ${course.batch}`}
-                                                    </span>
+                                                    
                                                 </div>
                                                 <h3 className="course-name">{course.courseName}</h3>
                                                 <div className="course-meta">
@@ -601,9 +598,7 @@ const ProfessorDashboard = () => {
                                             <div key={course._id} className="course-card claimable-card">
                                                 <div className="course-header">
                                                     <span className="course-code">{course.courseCode}</span>
-                                                    <span className="course-batch">
-                                                        {course.batch === 'all' ? 'All' : `B${course.batch}`}
-                                                    </span>
+                                                    
                                                 </div>
                                                 <h3 className="course-name">{course.courseName}</h3>
                                                 <div className="course-meta">

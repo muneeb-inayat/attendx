@@ -721,44 +721,17 @@
     margin: 0;
 }
 
-.batch-selector {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border-subtle);
-}
 
-.batch-selector label {
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: var(--text-secondary);
-}
 
-.batch-selector select {
-    padding: var(--space-2) var(--space-3);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    font-family: var(--font-sans);
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    cursor: pointer;
-}
 
-.batch-selector select.not-set {
-    border-color: var(--warning);
-}
 
-.batch-saving {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-}
 
-.batch-warning {
-    font-size: var(--text-xs);
-    color: var(--warning);
-}
+
+
+
+
+
+
 
 /* COURSE ATTENDANCE */
 .course-attendance-section {
@@ -1046,10 +1019,7 @@
     color: var(--success);
 }
 
-.info-badge.batch {
-    background: var(--warning-muted);
-    color: var(--warning);
-}
+
 
 /* DAY TABS */
 .day-tabs {
@@ -1256,11 +1226,7 @@
 }
 
 .timeline-room,
-.timeline-batch {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    margin-right: var(--space-2);
-}
+
 
 /* ===================================
    COURSES TAB

@@ -16,11 +16,6 @@ const CourseSchema = new mongoose.Schema({
         default: ''
     },
     
-    credits: {
-        type: Number,
-        default: 4,
-        min: 1
-    },
 
     // Academic Binding
     branch: {
@@ -34,13 +29,6 @@ const CourseSchema = new mongoose.Schema({
         required: true,
         min: 1,
         max: 8
-    },
-
-    // Batch: 'all' for entire branch, or '1'-'5' for specific batch
-    batch: {
-        type: String,
-        enum: ['all', '1', '2', '3', '4', '5'],
-        default: 'all'
     },
 
     // Admin who created the course

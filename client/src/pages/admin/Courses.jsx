@@ -11,7 +11,7 @@
 
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    const SAMPLE_CSV = `courseCode,courseName,description,credits,branch,semester,batch,day,startTime,endTime,room
+    const SAMPLE_CSV = `courseCode,courseName,description,branch,semester,day,startTime,endTime,room
     CS101,Programming Fundamentals,Introduction to Programming,4,cs,1,all,Monday,09:00,10:00,CS-101
     CS101,Programming Fundamentals,Introduction to Programming,4,cs,1,all,Wednesday,09:00,10:00,CS-101
     STAT201,Statistical Inference,Hypothesis Testing,4,stat,3,all,Tuesday,11:00,12:00,STAT-201`;
@@ -31,10 +31,8 @@
             courseCode: "",
             courseName: "",
             description: "",
-            credits: 4,
             branch: "",
             semester: 1,
-            batch: "all",
 
             schedules: [
                 {
@@ -96,10 +94,9 @@
                 courseCode: "",
                 courseName: "",
                 description: "",
-                credits: 4,
                 branch: "",
                 semester: 1,
-                batch: "all",
+
                 schedules: [
                     {
                         day: "Monday",
@@ -185,8 +182,6 @@
                 courseCode: course.courseCode, courseName: course.courseName,
                 description: course.description || '', branch: course.branch,
                 semester: course.semester,
-                credits: course.credits ?? 4,
-                batch: course.batch || 'all',
                 schedules: course.schedules?.length > 0
                     ? course.schedules
                     : [{ day: 'Monday', startTime: '09:00', endTime: '10:00', room: '' }],
@@ -410,9 +405,7 @@
                                     <div className="course-meta">
                                         <span className="meta-tag branch">{getBranchShort(course.branch)}</span>
                                         <span className="meta-tag">S{course.semester}</span>
-                                        <span className="meta-tag batch">
-                                            {course.batch === 'all' ? 'All' : `B${course.batch}`}
-                                        </span>
+                                        
                                     </div>
                                     {course.schedules?.length > 0 && (
                                         <div className="course-schedules">
@@ -617,32 +610,8 @@
                                                         {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Sem {s}</option>)}
                                                     </select>
                                                 </div>
-                                                <div className="form-group">
-                                                    <label>Batch *</label>
-                                                    <select
-                                                        value={formData.batch}
-                                                        onChange={e => setFormData({ ...formData, batch: e.target.value })}
-                                                        required
-                                                        className="form-input"
-                                                    >
-                                                        <option value="all">All Batches</option>
-                                                        {['1', '2', '3', '4', '5'].map(b => <option key={b} value={b}>Batch {b}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="form-group">
-                                                    <label>Credits </label>
-                                                    <input
-                                                        type="number"
-                                                        min={1}
-                                                        value={formData.credits}
-                                                        onChange={e =>
-                                                            setFormData({
-                                                                ...formData,
-                                                                credits: Number(e.target.value)
-                                                            })
-                                                        }
-                                                    />
-                                                </div>
+
+                            
                                             </div>
                                         </div>
 

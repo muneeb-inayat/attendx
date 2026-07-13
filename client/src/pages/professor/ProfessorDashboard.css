@@ -690,13 +690,7 @@
     border-radius: var(--radius-sm);
 }
 
-.course-batch {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    background: var(--bg-surface);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-}
+
 
 .course-name {
     font-size: var(--text-base);

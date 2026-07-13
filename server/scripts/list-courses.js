@@ -15,13 +15,13 @@ async function listCourses() {
 
         const Course = mongoose.model('Course', new mongoose.Schema({}, { strict: false }), 'courses');
 
-        const courses = await Course.find({}).select('courseCode courseName branch year batch').lean();
+        const courses = await Course.find({}).select('courseCode courseName branch year').lean();
 
         console.log(`Total courses: ${courses.length}\n`);
-        console.log('Branch | Year | Batch | Code | Name');
-        console.log('-------|------|-------|------|-----');
+        console.log('Branch | Year |  Code | Name');
+        console.log('-------|------|-------|-----');
         courses.forEach(c => {
-            console.log(`${c.branch || '-'} | ${c.year || '-'} | ${c.batch || 'all'} | ${c.courseCode} | ${c.courseName}`);
+            console.log(`${c.branch || '-'} | ${c.year || '-'} || 'all'} | ${c.courseCode} | ${c.courseName}`);
         });
 
         // Count by branch
