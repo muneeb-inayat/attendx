@@ -19,6 +19,28 @@ export const evaluateStudentDevice = async ({
     location,
     currentDeviceSecurity // optional: pass if caller already fetched the user, avoids a duplicate query
 }) => {
+    // ========================================
+    // Cross-account check: this device must not already be the ACTIVE
+    // device of a DIFFERENT student. Checked first, so it also blocks
+    // a device's very first login/attendance attempt on a second account
+    // (checkOrRequestDevice alone can't catch this — it only looks
+    // within one student's own device history).
+    // ========================================
+    const otherActiveOwners = await DeviceRegistry.find({
+        deviceHash,
+        status: 'active',
+        student: { $ne: studentId }
+    }).select('student');
+
+    if (otherActiveOwners.length > 0) {
+        return {
+            ok: false,
+            status: 409,
+            code: 'DEVICE_LINKED_TO_ANOTHER_ACCOUNT',
+            error: 'This device is already registered to another student account. Each device can only be used for one account.'
+        };
+    }
+
     let deviceSecurity = currentDeviceSecurity;
     if (deviceSecurity === undefined) {
         const student = await User.findById(studentId).select('deviceSecurity');
