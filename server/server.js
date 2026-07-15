@@ -6,6 +6,7 @@ import config from './config/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import keepAlive from './utils/keepalive.js';
+import { closeExpiredSessions } from './utils/sessionLifecycle.js';
 
 // Load environment variables
 dotenv.config();
@@ -239,6 +240,12 @@ app.listen(PORT, '0.0.0.0', () => {
 
     // Start keep-alive pings AFTER server is running
     keepAlive();
+
+    // Periodically auto-close sessions whose duration has elapsed
+    closeExpiredSessions().catch(err => console.error('Initial session sweep failed:', err.message));
+    setInterval(() => {
+        closeExpiredSessions().catch(err => console.error('Session sweep failed:', err.message));
+    }, 60 * 1000); // every 60s — adjust if you want tighter/looser precision
 });
 
 export default app;

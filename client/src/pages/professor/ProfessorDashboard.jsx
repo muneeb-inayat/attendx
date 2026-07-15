@@ -36,7 +36,7 @@ const ProfessorDashboard = () => {
 
     // Session Modal State
     const [showSessionModal, setShowSessionModal] = useState(false);
-    const [newSession, setNewSession] = useState({ courseId: '', duration: 60, radius: 150, qrInterval: 30 });
+    const [newSession, setNewSession] = useState({ courseId: '', duration: 10, radius: 15, qrInterval: 30 });
     const [location, setLocation] = useState(null);
     const [locationError, setLocationError] = useState('');
     const [gettingLocation, setGettingLocation] = useState(false);
@@ -864,8 +864,8 @@ const ProfessorDashboard = () => {
                                                 value={newSession.duration}
                                                 onChange={e => setNewSession({ ...newSession, duration: parseInt(e.target.value) })}
                                                 className="form-input"
-                                                min="10"
-                                                max="180"
+                                                min="1"
+                                                max="30"
                                             />
                                         </div>
                                         <div className="form-group">
@@ -875,8 +875,8 @@ const ProfessorDashboard = () => {
                                                 value={newSession.radius}
                                                 onChange={e => setNewSession({ ...newSession, radius: parseInt(e.target.value) })}
                                                 className="form-input"
-                                                min="20"
-                                                max="500"
+                                                min="5"
+                                                max="200"
                                             />
                                         </div>
                                     </div>

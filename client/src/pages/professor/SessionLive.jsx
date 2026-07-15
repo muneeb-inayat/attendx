@@ -68,6 +68,30 @@ const SessionLive = () => {
         return () => clearInterval(countdownRef.current);
     }, [qrExpiry, isActive]);
 
+    // Auto-detect session expiry client-side (backend sweep also closes
+    // it independently within ~60s, but this gives instant UI feedback
+    // without waiting for a poll to happen to fail).
+    useEffect(() => {
+        if (!session?.endTime || !isActive) return;
+
+        const endTimeMs = new Date(session.endTime).getTime();
+        const msRemaining = endTimeMs - Date.now();
+
+        if (msRemaining <= 0) {
+            setIsActive(false);
+            return;
+        }
+
+        const expiryTimer = setTimeout(() => {
+            setIsActive(false);
+            clearInterval(pollingRef.current);
+            clearInterval(countdownRef.current);
+            toast.info('Session duration ended');
+        }, msRemaining);
+
+        return () => clearTimeout(expiryTimer);
+    }, [session?.endTime, isActive]);
+
     const fetchSessionDetails = async () => {
         try {
             const res = await axios.get(`${API_URL}/sessions/${id}`, {
@@ -281,14 +305,23 @@ const SessionLive = () => {
 
     // Calculate session duration
     const getSessionDuration = () => {
-        if (!session?.startTime) return '0:00';
-        const start = new Date(session.startTime);
+        if (!session?.endTime) return '0:00';
+
         const now = new Date();
-        const diff = Math.floor((now - start) / 1000);
+        const end = new Date(session.endTime);
+
+        let diff = Math.floor((end - now) / 1000);
+
+        if (diff <= 0) return '0:00';
+
         const hours = Math.floor(diff / 3600);
         const mins = Math.floor((diff % 3600) / 60);
         const secs = diff % 60;
-        if (hours > 0) return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+        if (hours > 0) {
+            return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
@@ -373,10 +406,14 @@ const SessionLive = () => {
                                             />
                                         </svg>
                                         <span className="countdown-value">{countdown}s</span>
+
                                     </div>
+                                    <span className="param">⏱ Time Left: {getSessionDuration()}</span>
+
                                 </div>
 
                                 <div className="qr-actions">
+
                                     <button
                                         className="btn-refresh"
                                         onClick={handleForceRefresh}
@@ -393,14 +430,21 @@ const SessionLive = () => {
                                         className="btn-refresh btn-location"
                                         onClick={handleRefreshLocation}
                                         disabled={isRefreshingLocation}
+                                        
                                     >
                                         {isRefreshingLocation ? (
                                             <span className="btn-spinner"></span>
                                         ) : (
-                                            <span className="refresh-icon">📍</span>
+                                                <span className="refresh-icon">📍</span>
+                                                
+                                                
+                                                
                                         )}
+                                        
                                         <span>{isRefreshingLocation ? 'Updating...' : 'Refresh Location'}</span>
+                                        
                                     </button>
+                                    
                                     <button
                                         className="btn-stop"
                                         onClick={handleStopSession}
@@ -409,14 +453,14 @@ const SessionLive = () => {
                                         <span>Stop Session</span>
                                     </button>
                                 </div>
-
+                                        
                                 <div className="qr-info">
+                                    <span className="param">📍 Radius: {session?.radius || 150}m</span>
+
                                     <p className="security-note">
-                                        🔐 QR rotates every {session?.qrRotationInterval ? Math.round(session.qrRotationInterval / 1000) : 30}s with HMAC security
+                                        🔐 QR rotates every {session?.qrRotationInterval ? Math.round(session.qrRotationInterval / 1000) : 30}s
                                     </p>
                                     <div className="session-params">
-                                        <span className="param">📍 Radius: {session?.radius || 150}m</span>
-                                        <span className="param">⏱ Duration: {getSessionDuration()}</span>
                                         {session?.securityLevel && session.securityLevel !== 'standard' && (
                                             <span className="param security">🔒 {session.securityLevel.toUpperCase()}</span>
                                         )}
